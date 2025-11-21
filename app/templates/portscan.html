@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Portscan - CSI API</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <main class="page">
+        <div class="card">
+            <div class="top-section">
+                <div class="icons">
+                    <div class="logo">CSI</div>
+                </div>
+                <div class="border"></div>
+            </div>
+
+            <div class="bottom-section">
+                <span class="title">Portscan</span>
+                <p class="subtitle">Escanea puertos abiertos en un host</p>
+
+                <!-- 👇 Este formulario hace POST a /op_portscan -->
+                <form method="post" action="/op_portscan">
+                    <div style="margin-top: 12px; text-align: left; font-size: 11px; color: rgba(170,222,243,0.9);">
+                        <label for="host">Host o IP:</label><br />
+                        <input type="text" id="host" name="host" required
+                               style="width: 100%; margin-top: 4px; padding: 4px 6px; border-radius: 6px; border: none;">
+                    </div>
+
+                    <div style="margin-top: 10px; text-align: left; font-size: 11px; color: rgba(170,222,243,0.9);">
+                        <label for="ports">Puertos (ej: 80,443 o 1-1024):</label><br />
+                        <input type="text" id="ports" name="ports"
+                               style="width: 100%; margin-top: 4px; padding: 4px 6px; border-radius: 6px; border: none;">
+                    </div>
+
+                    <div style="text-align: center; margin-top: 18px;">
+                        <button type="submit" class="button_respuesta">
+                            <span class="text">Ejecutar</span>
+                        </button>
+                    </div>
+                </form>
+
+                <div class="bottom-section">
+                    <div class="cta">
+                        <a href="/" class="btn-blue">
+                            Volver a inicio
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

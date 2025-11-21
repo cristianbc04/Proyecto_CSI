@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>DoS - CSI API</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <main class="page">
+        <div class="card">
+            <div class="top-section">
+                <div class="icons">
+                    <div class="logo">CSI</div>
+                </div>
+                <div class="border"></div>
+            </div>
+
+            <div class="bottom-section">
+                <span class="title">DoS</span>
+                <p class="subtitle">Ataque de denegacion</p>
+
+                <!-- 👇 Este formulario hace POST a /op_ddos -->
+                <form method="post" action="/op_ddos" enctype="multipart/form-data">
+                    <div style="margin-top: 12px; text-align: left; font-size: 11px; color: rgba(170,222,243,0.9);">
+                        <label for="indice_destino">Indice_destino:</label><br />
+                        <input type="text" id="indice_destino" name="indice_destino" required
+                               style="width: 100%; margin-top: 4px; padding: 4px 6px; border-radius: 6px; border: none;">
+                    </div>
+
+                    <div style="margin-top: 12px; text-align: left; font-size: 11px; color: rgba(170,222,243,0.9);">
+                        <label for="packet_count">Packet_count:</label><br />
+                        <input type="text" id="packet_count" name="packet_count" required
+                               style="width: 100%; margin-top: 4px; padding: 4px 6px; border-radius: 6px; border: none;">
+                    </div>
+
+                    <div style="margin-top: 10px; text-align: left; font-size: 11px; color: rgba(170,222,243,0.9);">
+                        <p style="margin: 0 0 6px 0;">Subir Captura de Tráfico</p>
+
+                        <!-- Input file oculto -->
+                        <input class="input-file" type="file" id="pcap" name="pcap">
+
+                        <!-- Botón bonito que abre el selector de archivo -->
+                        <label for="pcap" class="upload-button">
+                            <!-- Icono opcional, puedes quitar el svg si no lo quieres -->
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+                                <path d="M4 17.5V19a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M12 5v11M8.5 8.5 12 5l3.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                            <span>Elegir archivo</span>
+                        </label>
+                    </div>
+
+                    <div style="text-align: center; margin-top: 18px;">
+                        <button type="submit" class="button_respuesta">
+                            <span class="text">Ejecutar</span>
+                        </button>
+                    </div>
+                </form>
+
+                <div class="bottom-section">
+                    <div class="cta">
+                        <a href="/" class="btn-blue">
+                            Volver a inicio
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

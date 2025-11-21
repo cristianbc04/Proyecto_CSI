@@ -1,0 +1,353 @@
+/* Botón azul tipo “Tailwind” */
+.btn-blue {
+  cursor: pointer;
+  transition: all 0.15s ease;
+  background-color: #3b82f6;          /* bg-blue-500 */
+  color: #ffffff;
+  padding: 0.5rem 1.5rem;             /* px-6 py-2 aproximado */
+  border-radius: 0.5rem;              /* rounded-lg */
+  border: 1px solid #2563eb;          /* border-blue-600 */
+  border-bottom-width: 4px;           /* border-b-[4px] */
+  display: inline-block;
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.btn-blue:hover {
+  filter: brightness(1.1);            /* hover:brightness-110 */
+  transform: translateY(-1px);        /* hover:-translate-y-[1px] */
+  border-bottom-width: 6px;           /* hover:border-b-[6px] */
+}
+
+.btn-blue:active {
+  filter: brightness(0.9);            /* active:brightness-90 */
+  transform: translateY(2px);         /* active:translate-y-[2px] */
+  border-bottom-width: 2px;           /* active:border-b-[2px] */
+}
+
+/* ========== ESTILOS GENERALES DE LA PÁGINA ========== */
+
+/* Fondo general de la página */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #020617; /* gris muy oscuro */
+}
+
+/* Contenedor principal centrado */
+.page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  /*align-items: center; */
+}
+
+.page.columns {
+  flex-direction: column;
+  gap: 32px;
+   align-items: center;   /* ok aquí */
+    padding-top: 40px;     /* deja respirar el contenido */
+}
+
+
+.page-header {
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.page-title {
+  font-size: 28px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #e5f4ff;
+}
+
+.page-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  color: rgba(148, 212, 255, 0.75);
+}
+
+/* Contenedor de todas las “carpetas” (cards) */
+.cards-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+/* Contenedor del botón de documentación */
+.docs-cta {
+  text-align: center;
+}
+
+/* ========== CARD / CARPETA ========== */
+/* From Uiverse.io by Smit-Prajapati */
+
+.card {
+  width: 260px;
+  border-radius: 20px;
+  background: #1b233d;
+  padding: 10px;
+  overflow: hidden;
+  box-shadow: rgba(100, 100, 111, 0.2) 0px 7px 20px 0px;
+  transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  color: white;
+}
+
+.card:hover {
+  transform: scale(1.05);
+}
+
+.card .top-section {
+  height: 150px;
+  border-radius: 15px;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(
+    45deg,
+    rgb(4, 159, 187) 0%,
+    rgb(80, 246, 255) 100%
+  );
+  position: relative;
+}
+
+.card .top-section .border {
+  border-bottom-right-radius: 10px;
+  height: 30px;
+  width: 130px;
+  background: #1b233d;
+  position: relative;
+  transform: skew(-40deg);
+  box-shadow: -10px -10px 0 0 #1b233d;
+}
+
+.card .top-section .border::before {
+  content: "";
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  top: 0;
+  right: -15px;
+  background: rgba(255, 255, 255, 0);
+  border-top-left-radius: 10px;
+  box-shadow: -5px -5px 0 2px #1b233d;
+}
+
+.card .top-section::before {
+  content: "";
+  position: absolute;
+  top: 30px;
+  left: 0;
+  background: rgba(255, 255, 255, 0);
+  height: 15px;
+  width: 15px;
+  border-top-left-radius: 15px;
+  box-shadow: -5px -5px 0 2px #1b233d;
+}
+
+.card .top-section .icons {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 30px;
+  display: flex;
+  justify-content: space-between;
+}
+
+.card .top-section .icons .logo {
+  height: 100%;
+  padding: 7px 0 7px 15px;
+  font-weight: 700;
+  color: #1b233d;
+}
+
+.card .top-section .icons .social-media {
+  height: 100%;
+  padding: 8px 15px;
+  display: flex;
+  gap: 7px;
+}
+
+.card .top-section .icons .social-media .svg {
+  height: 100%;
+  fill: #1b233d;
+}
+
+.card .top-section .icons .social-media .svg:hover {
+  fill: white;
+}
+
+.card .bottom-section {
+  margin-top: 15px;
+  padding: 10px 5px 5px;
+}
+
+.card .bottom-section .title {
+  display: block;
+  font-size: 17px;
+  font-weight: bolder;
+  color: white;
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+.card .bottom-section .subtitle {
+  text-align: center;
+  font-size: 11px;
+  color: rgba(170, 222, 243, 0.8);
+  margin-top: 4px;
+}
+
+/* Si en algún sitio vuelves a usar filas internas dentro de una card */
+.card .bottom-section .row {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 15px;
+}
+
+.card .bottom-section .row .item {
+  flex: 30%;
+  text-align: center;
+  padding: 5px;
+  color: rgba(170, 222, 243, 0.721);
+}
+
+.card .bottom-section .row .item .big-text {
+  font-size: 12px;
+  display: block;
+}
+
+.card .bottom-section .row .item .regular-text {
+  font-size: 9px;
+}
+
+/* Contenedor para el botón dentro de la tarjeta */
+.card .cta {
+  margin-top: 18px;
+  text-align: center;
+}
+
+/* Botón para subir archivos (Uiverse SpatexDEV) */
+.upload-button {
+  border: none;
+  display: flex;
+  padding: 0.75rem 1.5rem;
+  background-color: #488aec;
+  color: #ffffff;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  text-transform: uppercase;
+  vertical-align: middle;
+  align-items: center;
+  border-radius: 0.5rem;
+  user-select: none;
+  gap: 0.75rem;
+  box-shadow:
+    0 4px 6px -1px #488aec31,
+    0 2px 4px -1px #488aec17;
+  transition: all 0.6s ease;
+}
+
+.upload-button:hover {
+  box-shadow:
+    0 10px 15px -3px #488aec4f,
+    0 4px 6px -2px #488aec17;
+}
+
+.upload-button:focus,
+.upload-button:active {
+  opacity: 0.85;
+  box-shadow: none;
+}
+
+.upload-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+/* Ocultamos el input file real */
+.input-file {
+  display: none;
+}
+
+/* botón para ejecutar operadores */
+/* From Uiverse.io by reshades */ 
+.button_respuesta {
+  background-color: #ffffff00;
+  color: #fff;
+  width: 8.5em;
+  height: 2.9em;
+  border: #3654ff 0.2em solid;
+  border-radius: 11px;
+  text-align: right;
+  transition: all 0.6s ease;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.button_respuesta:hover {
+  background-color: #3654ff;
+  cursor: pointer;
+}
+
+.button_respuesta svg {
+  width: 1.6em;
+  margin: -0.2em 0.8em 1em;
+  position: absolute;
+  transition: all 0.6s ease;
+}
+
+.button_respuesta:hover svg {
+  transform: translateX(5px);
+}
+
+.button_respuesta .text {
+  margin: 0 1.5em;
+}
+
+.json-values {
+    width: 100%;
+    max-width: 700px;
+    background: #1b233d;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: rgba(0, 0, 0, 0.35) 0px 5px 15px;
+    color: #e5f4ff;
+}
+
+.json-values h2 {
+    margin-bottom: 12px;
+    font-size: 18px;
+    color: #94d4ff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.json-pre {
+    background: #0f172a;        /* Fondo oscuro */
+    padding: 12px;
+    border-radius: 8px;
+    color: #e5f4ff;             /* Texto muy claro */
+    white-space: pre-wrap;
+    font-family: Consolas, monospace;
+}
+
+pre {
+    background: #0f172a;        /* Igual que .json-pre */
+    padding: 12px;
+    border-radius: 8px;
+    color: #e5f4ff;             /* Color del texto */
+    white-space: pre-wrap;
+    font-family: Consolas, monospace;
+}
+
+
+

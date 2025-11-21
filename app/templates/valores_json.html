@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>CSI API</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        pre, code {
+            color: #ffffff;
+            background: transparent;
+            font-family: Consolas, monospace;
+            white-space: pre-wrap;
+            text-align: center;   
+
+        }
+
+        h2 {
+            color: #ffffff;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <main class="page columns">
+
+        <header class="page-header">
+            <h1 class="page-title">CSI API - Destinos pcap</h1>
+            <p class="page-subtitle">Cantidas y destinos del pcap</p>
+        </header>
+
+        <section>
+            <h2>Total de Destinos</h2>
+            <pre>
+{{ total_destinos }}
+            </pre>
+        </section>
+
+        <section>
+            <h2>Listado de Destinos</h2>
+            <pre>
+{% for destino in destinos %}
+{{ destino }}
+{% endfor %}
+            </pre>
+        </section>
+
+    </main>
+</body>
+</html>
