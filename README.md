@@ -79,6 +79,10 @@ python -m pip install --upgrade pip
 
 ```
 pip install "fastapi[standard]"
+
+pip install scapy
+
+pip install pyfiglet 
 ```
 
 Si necesitas levantar el servidor local:
@@ -89,12 +93,13 @@ pip install uvicorn
 
 ---
 
+
 ## ▶️ Ejecución del Proyecto
 
-Una vez activado el entorno virtual y dentro de la carpeta `app/`:
+Una vez activado el entorno virtual y dentro de la carpeta `Proyecto_CSI`:
 
 ```
-uvicorn main:app --reload
+uvicorn app.main:app --reload
 ```
 
 La API estará disponible en:
