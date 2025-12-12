@@ -111,48 +111,41 @@ def ataques_con_mensaje(
 
     # Orígenes únicos en los datos
     origenes = {d['ip_src'] for d in datos if d.get('ip_src')}
-    print(f"[debug] Orígenes únicos en el pcap (datos): {len(origenes)}")
 
     if not origenes:
-        print("[!] No se encontraron IP origen en los datos extraídos.")
+        raise HTTPException(status_code=400, detail="No hay ip's.")
     
     elemet_index = random.randrange(0, len(origenes))
-    hostname = socket.gethostname()
-    IPAddr = socket.gethostbyname(hostname)
+    
+    IPAddr = "192.168.0.29"
     element_random = list(origenes)[elemet_index]
-
+    
     datos_DOS = []
-    default_payload = b'LAB_PAYLOAD'  # payload por defecto
-
+    default_payload = b'LAB_PAYLOAD' # payload por defecto
     for ip in (element_random, IPAddr):
         if any(entry['ip'] == ip for entry in datos_DOS):
             continue
         if es_ip_valida(ip):
             datos_DOS.append({'ip': ip, 'payload': default_payload})
         else:
-            print(f"[!] IP inválida descartada: {ip}")
+             raise HTTPException(status_code=400, detail="IP inválida descartada: {ip}")
 
     if not datos_DOS:
-        print("[!] No hay orígenes válidos (aleatorio y/o local).")
-        return 0
-
+        raise HTTPException(status_code=400, detail="No hay orígenes válidos (aleatorio y/o local).")
+        
     for d in datos_DOS:
+        # crear paquetes
         for i in range(packet_count):
             pkt = IP(src=d['ip'], dst=target_ip) / UDP(sport=12345, dport=12345) / Raw(load=d['payload'])
+            # tiempos consecutivos para evitar paquetes con tiempo 0 todos iguales
             pkt.time = i * 0.0001
             nuevo_paquete.append(pkt)
 
-            if (i < 3) or ((i + 1) % 10 == 0) or (i == packet_count - 1):
-                print(f"Generando {i+1}/{packet_count}: {d['ip']} → {target_ip}")
-
     if not nuevo_paquete:
-        print("[!] No se generó ningún paquete.")
-        return 0
+        raise HTTPException(status_code=400, detail="No se ha podido generar ningun paquete.")
 
     # 🟢 Guardar en el output_path que le pasamos
     wrpcap(output_path, nuevo_paquete)
-    print(f"[✔] pcap de ataque guardado en: {output_path} (paquetes: {len(nuevo_paquete)})")
-
     return len(nuevo_paquete)
 
 @router.get("/op_dos", response_class=HTMLResponse, tags=["op_dos"])

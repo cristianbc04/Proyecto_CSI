@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Rogue - CSI API</title>
+    <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+    <main class="page">
+        <div class="card">
+            <div class="top-section">
+                <div class="icons">
+                    <div class="logo">CSI</div>
+                </div>
+                <div class="border"></div>
+            </div>
+
+            <div class="bottom-section">
+                <span class="title">Rogue</span>
+                <p class="subtitle">Suplantacion de servidor dhcp</p>
+
+                <!-- 👇 Este formulario hace POST a /op_portscan -->
+                <form method="post" action="/op_rogue">
+                    <div style="margin-top: 12px; text-align: left; font-size: 11px; color: rgba(170,222,243,0.9);">
+                        <label for="mac_victima">Mac de la victima:</label><br />
+                        <input type="text" id="mac_victima" name="mac_victima" required
+                               style="width: 100%; margin-top: 4px; padding: 4px 6px; border-radius: 6px; border: none;">
+                    </div>
+
+                    <div style="text-align: center; margin-top: 18px;">
+                        <button type="submit" class="button_respuesta">
+                            <span class="text">Ejecutar</span>
+                        </button>
+                    </div>
+                </form>
+
+                <div class="bottom-section">
+                    <div class="cta">
+                        <a href="/" class="btn-blue">
+                            Volver a inicio
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

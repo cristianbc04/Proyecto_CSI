@@ -8,6 +8,7 @@ from app.routers.FastApi_analizador import router as analizador
 from app.routers.FastApi_portscan import router as portscan
 from app.routers.FastApi_dos import router as dos
 from app.routers.FastApi_arpSpoofing import router as arp
+from app.routers.FastApi_rogue import router as rogue
 
 app = FastAPI(title="Mi API CSI")
 
@@ -20,6 +21,7 @@ app.include_router(analizador)
 app.include_router(portscan)
 app.include_router(dos)
 app.include_router(arp)
+app.include_router(rogue)
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):
