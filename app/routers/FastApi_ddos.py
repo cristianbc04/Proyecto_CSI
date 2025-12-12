@@ -6,216 +6,264 @@ import subprocess
 import tempfile
 from typing import List, Dict
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query, APIRouter, Request
+from fastapi import UploadFile, File, HTTPException, Query, APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from scapy.all import IP, UDP, Raw, wrpcap
 
-# ----------------------------------------
-#  Configuración / constantes
-# ----------------------------------------
 
-default_packet_count = 50
-HEX_RE = re.compile(r'^[0-9a-fA-F]+$')
+# ======================================================
+#  Configuración y constantes
+# ======================================================
+
+DEFAULT_PACKET_COUNT = 50
+HEX_PAYLOAD_REGEX = re.compile(r"^[0-9a-fA-F]+$")
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
 
-# ----------------------------------------
-#  Funciones auxiliares (adaptadas de tu script)
-# ----------------------------------------
+# ======================================================
+#  Funciones auxiliares
+# ======================================================
 
-def extraer_destinos(pcap_file: str) -> List[str]:
-    cmd = [
-        "tshark", "-r", pcap_file,
-        "-T", "fields", "-e", "ip.dst",
-        "udp"
-    ]
+def is_valid_ip(address: str) -> bool:
+    """Comprueba si una IP es válida."""
     try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        ips = [l.strip() for l in res.stdout.splitlines() if l.strip()]
-        destinos, vistos = [], set()
-        for ip in ips:
-            if ip not in vistos:
-                vistos.add(ip)
-                destinos.append(ip)
-        return destinos
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"No se pudo ejecutar tshark: {e}") from e
-
-
-def procesar_lineas_con_mensaje(lineas: List[str]) -> List[Dict]:
-    resultados = []
-    for linea in lineas:
-        campos = linea.strip().split('\t')
-        if len(campos) < 3:
-            continue
-        ip_src = campos[0].strip()
-        ip_dst = campos[1].strip()
-        mensaje = campos[2].strip()
-        if not ip_src or not ip_dst or not mensaje:
-            continue
-        resultados.append({
-            'ip_src': ip_src,
-            'ip_dst': ip_dst,
-            'mensaje': mensaje
-        })
-    return resultados
-
-
-def extraer_mensajes(pcap_file: str) -> List[Dict]:
-    cmd = [
-        "tshark", "-r", pcap_file,
-        "-T", "fields",
-        "-e", "ip.src", "-e", "ip.dst", "-e", "data.data",
-        "udp"
-    ]
-    try:
-        res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-        lineas = res.stdout.splitlines()
-        return procesar_lineas_con_mensaje(lineas)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"No se pudo extraer mensajes de {pcap_file}: {e}") from e
-
-
-def es_ip_valida(addr: str) -> bool:
-    try:
-        ipaddress.ip_address(addr)
+        ipaddress.ip_address(address)
         return True
     except ValueError:
         return False
 
 
-def convertir_payload(mensaje: str) -> bytes:
-    msg = mensaje.replace(':', '').replace(' ', '')
-    if HEX_RE.match(msg) and len(msg) % 2 == 0:
+def hex_or_text_to_bytes(payload: str) -> bytes:
+    """
+    Convierte un payload hexadecimal a bytes si es válido.
+    Si no, devuelve el texto codificado.
+    """
+    clean = payload.replace(":", "").replace(" ", "")
+
+    if HEX_PAYLOAD_REGEX.fullmatch(clean) and len(clean) % 2 == 0:
         try:
-            return bytes.fromhex(msg)
-        except Exception:
+            return bytes.fromhex(clean)
+        except ValueError:
             pass
-    return mensaje.encode('latin1', errors='replace')
+
+    return payload.encode("latin1", errors="replace")
 
 
-def ataques_con_mensaje(
-    datos: List[Dict],
-    target_ip: str,
-    packet_count: int = default_packet_count,
-    output_path: str = "salida.pcap",
-) -> int:
-    nuevo_paquete = []
+# ======================================================
+#  Extracción de información desde PCAP
+# ======================================================
+def extract_destinations(pcap_path: str) -> List[str]:
+    """
+    Extrae IPs destino únicas de tráfico UDP usando tshark.
+    Mantiene el orden de aparición.
+    """
+    
+    cmd = [
+        "tshark",
+        "-r", pcap_path,
+        "-T", "fields",
+        "-e", "ip.dst",
+        "udp",
+    ]
 
-    origenes = {d['ip_src'] for d in datos if d.get('ip_src')}
-    if not origenes:
-        raise RuntimeError("No se encontraron IP origen en los datos extraídos.")
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"Error ejecutando tshark: {e}") from e
 
-    payloads_por_src = {}
-    for d in datos:
-        src = d['ip_src']
-        if src not in payloads_por_src and d.get('mensaje'):
-            payloads_por_src[src] = d['mensaje']
+    destinations: List[str] = []
+    seen = set()
 
-    default_payload = b'LAB_PAYLOAD'
+    for line in result.stdout.splitlines():
+        ip = line.strip()
+        if ip and ip not in seen:
+            seen.add(ip)
+            destinations.append(ip)
 
-    for src in origenes:
-        if not es_ip_valida(src):
-            # simplemente lo saltamos, no petamos todo
+    return destinations
+
+
+def parse_message_lines(lines: List[str]) -> List[Dict[str, str]]:
+    """
+    Procesa líneas tshark con formato:
+    ip.src \t ip.dst \t data.data
+    """
+    
+    parsed = []
+    for line in lines:
+        fields = line.strip().split("\t")
+        if len(fields) < 3:
             continue
 
-        payload_hex = None
-        for d in datos:
-            if d['ip_src'] == src and d['ip_dst'] == target_ip and d.get('mensaje'):
-                payload_hex = d['mensaje']
-                break
+        src_ip, dst_ip, message = map(str.strip, fields[:3])
+        if not (src_ip and dst_ip and message):
+            continue
 
-        if payload_hex is None:
-            payload_hex = payloads_por_src.get(src)
+        parsed.append({
+            "ip_src": src_ip,
+            "ip_dst": dst_ip,
+            "message": message,
+        })
 
-        if payload_hex is None:
-            payload_bytes = default_payload
-        else:
-            payload_bytes = convertir_payload(payload_hex)
+    return parsed
+
+
+def extract_udp_messages(pcap_path: str) -> List[Dict[str, str]]:
+    """Extrae mensajes UDP (payload) desde un PCAP usando tshark."""
+    
+    cmd = [
+        "tshark",
+        "-r", pcap_path,
+        "-T", "fields",
+        "-e", "ip.src",
+        "-e", "ip.dst",
+        "-e", "data.data",
+        "udp",
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"No se pudieron extraer mensajes UDP: {e}") from e
+
+    return parse_message_lines(result.stdout.splitlines())
+
+
+# ======================================================
+#  Generación de tráfico "de ataque"
+# ======================================================
+
+def generate_attack_pcap(
+    extracted_data: List[Dict[str, str]],
+    target_ip: str,
+    packet_count: int,
+    output_path: str,
+) -> int:
+    """
+    Genera un PCAP con tráfico UDP repetitivo hacia una IP destino,
+    reutilizando payloads observados.
+    """
+    
+    packets = []
+    default_payload = b"LAB_PAYLOAD"
+
+    source_ips = {
+        entry["ip_src"]
+        for entry in extracted_data
+        if is_valid_ip(entry.get("ip_src", ""))
+    }
+
+    if not source_ips:
+        raise RuntimeError("No se encontraron IPs origen válidas.")
+
+    # Primer payload observado por cada IP origen
+    payload_by_src = {}
+    for entry in extracted_data:
+        src = entry["ip_src"]
+        if src not in payload_by_src and entry.get("message"):
+            payload_by_src[src] = entry["message"]
+
+    for src_ip in source_ips:
+        payload_hex = next(
+            (
+                d["message"]
+                for d in extracted_data
+                if d["ip_src"] == src_ip and d["ip_dst"] == target_ip
+            ),
+            payload_by_src.get(src_ip),
+        )
+
+        payload_bytes = (
+            hex_or_text_to_bytes(payload_hex)
+            if payload_hex
+            else default_payload
+        )
 
         for i in range(packet_count):
-            pkt = IP(src=src, dst=target_ip) / UDP(sport=12345, dport=12345) / Raw(load=payload_bytes)
+            pkt = (
+                IP(src=src_ip, dst=target_ip)
+                / UDP(sport=12345, dport=12345)
+                / Raw(load=payload_bytes)
+            )
             pkt.time = i * 0.0001
-            nuevo_paquete.append(pkt)
+            packets.append(pkt)
 
-    if not nuevo_paquete:
-        raise RuntimeError("No se generó ningún paquete. Revisa que tshark haya extraído mensajes UDP con payload.")
+    if not packets:
+        raise RuntimeError("No se generaron paquetes UDP.")
 
-    wrpcap(output_path, nuevo_paquete)
-    return len(nuevo_paquete)
+    wrpcap(output_path, packets)
+    return len(packets)
 
-# ----------------------------------------
+
+# ======================================================
 #  Endpoints FastAPI
-# ----------------------------------------
+# ======================================================
 
 @router.get("/op_ddos", response_class=HTMLResponse, tags=["op_ddos"])
-async def cargar_pagina_portscan(request: Request):
-        return templates.TemplateResponse("ddos.html", {"request": request})
+async def ddos_page(request: Request):
+    return templates.TemplateResponse("ddos.html", {"request": request})
 
 
 @router.post("/op_ddos", response_class=FileResponse, tags=["op_ddos"])
-async def mutar_pcap(
+async def ddos_execute(
     pcap: UploadFile = File(..., description="Archivo PCAP de entrada"),
-    indice_destino: int = Query(0, ge=0, description="Índice de IP destino a usar"),
-    packet_count: int = Query(default_packet_count, ge=1, le=10000, description="Paquetes por IP origen"),
+    destination_index: int = Query(0, ge=0, description="Índice de IP destino"),
+    packet_count: int = Query(
+        DEFAULT_PACKET_COUNT,
+        ge=1,
+        le=10000,
+        description="Paquetes por IP origen",
+    ),
 ):
-    """Recibe un pcap, genera un nuevo pcap 'de ataque' y lo devuelve."""
-
-    # Guardar el pcap subido en un archivo temporal
+    # Guardar PCAP de entrada
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pcap") as tmp:
-            contenido = await pcap.read()
-            tmp.write(contenido)
-            tmp_path = tmp.name
+            tmp.write(await pcap.read())
+            input_path = tmp.name
     except Exception:
-        raise HTTPException(status_code=500, detail="No se pudo guardar el archivo PCAP temporal.")
+        raise HTTPException(500, "No se pudo guardar el PCAP de entrada")
 
-    # Crear archivo de salida temporal
-    out_fd, out_path = tempfile.mkstemp(suffix=".pcap")
+    # Archivo de salida
+    out_fd, output_path = tempfile.mkstemp(suffix=".pcap")
     os.close(out_fd)
 
     try:
-        destinos = extraer_destinos(tmp_path)
-        if not destinos:
-            raise HTTPException(status_code=400, detail="No se encontraron IP destino en el PCAP.")
+        destinations = extract_destinations(input_path)
+        if not destinations:
+            raise HTTPException(400, "No se encontraron IP destino en el PCAP")
 
-        if indice_destino < 0 or indice_destino >= len(destinos):
-            detalle = {
-                "error": "Índice fuera de rango",
-                "indices_validos": list(range(len(destinos))),
-                "destinos": destinos,
-            }
-            raise HTTPException(status_code=400, detail=detalle)
+        if destination_index >= len(destinations):
+            raise HTTPException(
+                400,
+                {
+                    "error": "Índice fuera de rango",
+                    "destinos": destinations,
+                },
+            )
 
-        target_ip = destinos[indice_destino]
+        target_ip = destinations[destination_index]
+        extracted_data = extract_udp_messages(input_path)
 
-        datos = extraer_mensajes(tmp_path)
-
-        total_paquetes = ataques_con_mensaje(
-            datos,
+        packet_total = generate_attack_pcap(
+            extracted_data,
             target_ip,
-            packet_count=packet_count,
-            output_path=out_path,
+            packet_count,
+            output_path,
         )
 
-        if total_paquetes == 0:
-            raise HTTPException(status_code=400, detail="No se generaron paquetes.")
-
-        # Devolvemos el archivo generado
         return FileResponse(
-            out_path,
+            output_path,
             media_type="application/vnd.tcpdump.pcap",
             filename=f"ataque_{target_ip.replace('.', '_')}.pcap",
         )
 
     except RuntimeError as e:
-        # errores de nuestra lógica
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(500, str(e))
+
     finally:
-        # limpiar el pcap de entrada; el de salida lo borrará el sistema después de servirlo (según cómo despliegues)
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
+        if os.path.exists(input_path):
+            os.remove(input_path)

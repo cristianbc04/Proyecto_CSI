@@ -57,6 +57,7 @@ def is_valid_mac(mac: str) -> bool:
 # ----------------------------------------
 def build_attack_packets(victim_mac: str, config: RogueConfig):
     """Genera paquetes DHCP Discover y Offer para simulación Rogue DHCP."""
+    
     victim_bytes = bytes.fromhex(victim_mac.replace(":", ""))
 
     dhcp_discover = (

@@ -44,7 +44,6 @@ async def analizador_execute(
     request: Request,
     pcap: UploadFile = File(..., description="Archivo PCAP de entrada")
 ):
-    
     if not pcap.filename or not pcap.filename.endswith(".pcap"):
         raise HTTPException( status_code=400, detail="Debe subir un archivo PCAP válido (.pcap)")
     
