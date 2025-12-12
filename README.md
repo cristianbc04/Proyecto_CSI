@@ -9,6 +9,7 @@ Este proyecto implementa una **API en FastAPI** que permite ejecutar y analizar 
 * **ARP Spoofing**
 * **Port Scanning**
 * **Analizador de tráfico**
+*  **Rogue**
 
 El objetivo es ofrecer un entorno organizado, modular y fácil de desplegar para pruebas, análisis y aprendizaje.
 
@@ -120,6 +121,8 @@ Cada operador tiene su propio router. Ejemplos:
 * `/op_dos`
 * `/op_portscan`
 * `/op_analizador`
+* `/op_rogue`
+* `/op_arp`
 
 Las rutas ofrecen formularios HTML para interacción o respuestas JSON según el endpoint.
 
