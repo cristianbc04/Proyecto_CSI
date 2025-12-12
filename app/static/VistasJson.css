@@ -1,0 +1,34 @@
+/* Fondo general */
+body {
+    background-color: #0b0f14;
+}
+
+/* Texto consola */
+pre,
+code {
+    color: #ffffff;
+    background: transparent;
+    font-family: Consolas, monospace;
+    white-space: pre-wrap;
+    text-align: center;
+    font-size: 13px;
+}
+
+/* Títulos */
+h2 {
+    color: #ffffff;
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+/* Contenedores */
+.result-container {
+    margin-top: 20px;
+}
+
+/* Enlaces de vuelta */
+.back-link {
+    display: block;
+    margin-top: 20px;
+    text-align: center;
+}

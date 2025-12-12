@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from typing import List
 import pyfiglet
 import socket
 import subprocess
@@ -6,7 +7,7 @@ from datetime import datetime
 from contextlib import closing
 import tempfile
 
-from fastapi import APIRouter, Request, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, Request, UploadFile, File, HTTPException, Query, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -18,40 +19,51 @@ templates = Jinja2Templates(directory="app/templates")
 #   FUNCIONES INTERNAS
 # --------------------------
 
-def buscar_destino(pcap_file: str, ip_busqueda: str) -> bool:
-    cmd = [
-        "tshark", "-r", pcap_file,
-        "-Y", "icmp.type == 8",
-        "-T", "fields", "-e", "ip.dst",
-    ]
-    res = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    ips = [l.strip() for l in res.stdout.splitlines() if l.strip()]
-    return ip_busqueda in ips
-
-
-def banner(target):
+def banner(target: str) -> str:
     ascii_banner = pyfiglet.figlet_format("PORT SCANNER")
-    print(ascii_banner)
-    print("-" * 50)
-    print("Scanning Target: " + target)
-    print("Scanning started at:" + str(datetime.now()))
-    print("-" * 50)
+    lines = [
+        ascii_banner,
+        "-" * 50,
+        f"Scanning Target: {target}",
+        f"Scanning started at: {datetime.now()}",
+        "-" * 50,
+    ]
+    return "\n".join(lines)
 
-
-def PortScan(ip_port):
-    start = 1
-    end = 65535
+def PortScan(host: str, ports: str) -> str:
+    output = []
     timeout = 0.8
-    open_ports = []
+    
+    ports = ports.strip()
 
-    for port in range(start, end + 1):
+    if not ports:
+        port_list = range(1, 65536)
+    else:
+        parsed_ports = set()
+
+        for part in ports.split(","):
+            part = part.strip()
+
+            if "-" in part:
+                start, end = part.split("-", 1)
+                start, end = int(start), int(end)
+                parsed_ports.update(range(start, end + 1))
+            else:
+                parsed_ports.add(int(part))
+
+        port_list = sorted(parsed_ports)
+
+    for port in port_list:
         with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
             s.settimeout(timeout)
-            result = s.connect_ex((ip_port, port))
-            if result == 0:
-                open_ports.append(port)
+            result = s.connect_ex((host, port))
 
-    return open_ports
+            if result == 0:
+                output.append(f"[+] Port {port} OPEN")
+            else:
+                output.append(f"[-] Port {port} CLOSED")
+
+    return "\n".join(output)
 
 
 # --------------------------
@@ -65,36 +77,26 @@ async def cargar_pagina_portscan(request: Request):
 # --------------------------
 #   RUTA POST (API)
 # --------------------------
-@router.post("/op_portscan", tags=["op_portscan"])
+@router.post("/op_portscan", response_class=HTMLResponse, tags=["op_portscan"])
 async def ejecutar_portscan(
-    pcap: UploadFile = File(...),
-    indice_destino: int = Query(0, ge=0)
+    request: Request,
+    ports: str = Form(""),
+    host: str = Form(...)
 ):
-    """Recibe un PCAP y devuelve la IP analizada y sus puertos abiertos"""
-    
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pcap") as tmp:
-            contenido = await pcap.read()
-            tmp.write(contenido)
-            tmp_path = tmp.name
-    except:
-        raise HTTPException(500, "Error guardando el archivo temporal.")
+    if not host:
+        raise HTTPException(status_code=400, detail="Host no válido")
 
-    ip_busqueda = indice_destino
+    result_text = (
+        banner(host) +
+        "\n" +
+        PortScan(host, ports)
+    )
 
-    try:
-        destino = buscar_destino(tmp_path, ip_busqueda)
-        banner(destino)
-        return {
-            "Ip": destino,
-            "Puertos Abiertos": PortScan(destino)
+    return templates.TemplateResponse(
+        "salida_portScan.html",
+        {
+            "request": request,
+            "result": result_text
         }
-    except Exception as e:
-        raise HTTPException(500, str(e))
-    finally:
-        try:
-            import os
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-        except:
-            pass
+    )
+        
