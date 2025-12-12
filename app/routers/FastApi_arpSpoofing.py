@@ -1,3 +1,4 @@
+import ipaddress
 import subprocess
 import os
 import tempfile
@@ -13,6 +14,14 @@ templates = Jinja2Templates(directory="app/templates")
 # ----------------------------------------
 #  Funciones internas
 # ----------------------------------------
+def is_valid_ip(address: str) -> bool:
+    """Comprueba si una IP tiene un formato válido."""
+    try:
+        ipaddress.ip_address(address)
+        return True
+    except ValueError:
+        return False
+
 def detect_physical_iface():
     """ que tenga dirección IP en una red privada. Funciona para cualquier IP y cualquier interfaz física."""
     
@@ -104,6 +113,10 @@ async def arp_execute(
     ip_victima: str = Form(None, description="IP victima"),
     ip_router: str = Form(None, description="IP router")
 ):  
+    
+    if not is_valid_ip(ip_victima) or is_valid_ip(ip_router):
+        raise HTTPException(status_code=500, detail="La ip de router y/o ip de la victima son validas")
+    
     # Crear archivo de salida temporal
     out_fd, out_path = tempfile.mkstemp(suffix=".pcap")
     os.close(out_fd)

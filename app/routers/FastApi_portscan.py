@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import ipaddress
 import pyfiglet
 import socket
 from datetime import datetime
@@ -14,6 +15,14 @@ templates = Jinja2Templates(directory="app/templates")
 # ----------------------------------------
 #  Funciones internas
 # ----------------------------------------
+def is_valid_ip(address: str) -> bool:
+    """Comprueba si una IP tiene un formato válido."""
+    try:
+        ipaddress.ip_address(address)
+        return True
+    except ValueError:
+        return False
+
 def banner(target: str) -> str:
     """ Obtencio de banner para vista del json """
     
@@ -82,6 +91,9 @@ async def portScan_execute(
 ):
     if not host:
         raise HTTPException(status_code=400, detail="No pasaste un host")
+    
+    if not is_valid_ip(host):
+        raise HTTPException(status_code=400, detail="La ip que has pasado no es valida")
     
     # Texto que guarda lo que se devolvera en formato json de puertos abiertos del equipo pasado
     result_text = (
