@@ -2,12 +2,12 @@
 .btn-blue {
   cursor: pointer;
   transition: all 0.15s ease;
-  background-color: #3b82f6;          /* bg-blue-500 */
+  background-color: #3b82f6;          
   color: #ffffff;
-  padding: 0.5rem 1.5rem;             /* px-6 py-2 aproximado */
-  border-radius: 0.5rem;              /* rounded-lg */
-  border: 1px solid #2563eb;          /* border-blue-600 */
-  border-bottom-width: 4px;           /* border-b-[4px] */
+  padding: 0.5rem 1.5rem;             
+  border-radius: 0.5rem;              
+  border: 1px solid #2563eb;          
+  border-bottom-width: 4px;          
   display: inline-block;
   text-decoration: none;
   font-weight: 700;
@@ -15,15 +15,15 @@
 }
 
 .btn-blue:hover {
-  filter: brightness(1.1);            /* hover:brightness-110 */
-  transform: translateY(-1px);        /* hover:-translate-y-[1px] */
-  border-bottom-width: 6px;           /* hover:border-b-[6px] */
+  filter: brightness(1.1);            
+  transform: translateY(-1px);        
+  border-bottom-width: 6px;           
 }
 
 .btn-blue:active {
-  filter: brightness(0.9);            /* active:brightness-90 */
-  transform: translateY(2px);         /* active:translate-y-[2px] */
-  border-bottom-width: 2px;           /* active:border-b-[2px] */
+  filter: brightness(0.9);            
+  transform: translateY(2px);         
+  border-bottom-width: 2px;           
 }
 
 /* ========== ESTILOS GENERALES DE LA PÁGINA ========== */
@@ -33,7 +33,7 @@ body {
   margin: 0;
   padding: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: #020617; /* gris muy oscuro */
+  background: #020617; 
 }
 
 /* Contenedor principal centrado */
@@ -47,8 +47,8 @@ body {
 .page.columns {
   flex-direction: column;
   gap: 32px;
-   align-items: center;   /* ok aquí */
-    padding-top: 40px;     /* deja respirar el contenido */
+   align-items: center;   
+    padding-top: 40px;     
 }
 
 
@@ -67,7 +67,8 @@ body {
 .page-subtitle {
   margin-top: 4px;
   font-size: 13px;
-  color: rgba(148, 212, 255, 0.75);
+  color: #ffffff;      
+  font-weight: bold;   
 }
 
 /* Contenedor de todas las “carpetas” (cards) */
@@ -198,11 +199,11 @@ body {
 .card .bottom-section .subtitle {
   text-align: center;
   font-size: 11px;
-  color: rgba(170, 222, 243, 0.8);
+  color: #ffffff;     
+  font-weight: bold;   
   margin-top: 4px;
 }
 
-/* Si en algún sitio vuelves a usar filas internas dentro de una card */
 .card .bottom-section .row {
   display: flex;
   justify-content: space-between;
@@ -272,7 +273,6 @@ body {
   height: 1.25rem;
 }
 
-/* Ocultamos el input file real */
 .input-file {
   display: none;
 }
@@ -332,19 +332,19 @@ body {
     letter-spacing: 1px;
 }
 .json-pre {
-    background: #0f172a;        /* Fondo oscuro */
+    background: #0f172a;        
     padding: 12px;
     border-radius: 8px;
-    color: #e5f4ff;             /* Texto muy claro */
+    color: #e5f4ff;             
     white-space: pre-wrap;
     font-family: Consolas, monospace;
 }
 
 pre {
-    background: #0f172a;        /* Igual que .json-pre */
+    background: #0f172a;        
     padding: 12px;
     border-radius: 8px;
-    color: #e5f4ff;             /* Color del texto */
+    color: #e5f4ff;            
     white-space: pre-wrap;
     font-family: Consolas, monospace;
 }

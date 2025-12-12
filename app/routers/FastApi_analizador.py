@@ -1,21 +1,20 @@
 #!/usr/bin/env python3
-import ipaddress
-import os
-import re
 import subprocess
 import tempfile
-from typing import List, Dict
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query, APIRouter, Request
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi import UploadFile, File, HTTPException, Query, APIRouter, Request
+from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-
-from scapy.all import IP, UDP, Raw, wrpcap
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-def obtener_destinos(pcap_file):
+# ----------------------------------------
+#  Funciones internas
+# ----------------------------------------
+def get_destinations(pcap_file):
+    """ Funcion que obtiene cantidad de destinos del pcap """
+    
     TSHARK_COMMAND = [ # comandos para poder analizar el archivo .pcacp que se le pase.
         "tshark",
         "-r", pcap_file, # para saber que archivo es el que vamos a leer.
@@ -30,20 +29,25 @@ def obtener_destinos(pcap_file):
         destinos = set([linea.strip() for linea in lineas if linea.strip()])
         return destinos
 
-    except subprocess.CalledProcessError as e: # esto de aqui es lo que devuelve check si es false, 'e' tendra el error.
-        print(f"[ERROR] No se pudo ejecutar tshark: {e}")
-        return set()
-    
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError("Error ejecutando tshark") from e  
+
+# ----------------------------------------
+#  Endpoints FastAPI
+# ----------------------------------------
 @router.get("/op_analizador", response_class=HTMLResponse, tags=["op_analizador"])
-async def cargar_pagina_html(request: Request):
+async def analizador_page(request: Request):
     return templates.TemplateResponse("analizador.html", {"request": request})
 
 @router.post("/op_analizador", tags=["op_analizador"])
-async def analizador_paquete(
+async def analizador_execute(
     request: Request,
     pcap: UploadFile = File(..., description="Archivo PCAP de entrada")
 ):
-    """Recibe un pcap, devuelve el numero de paquetes distintos de destino"""
+    
+    if not pcap.filename or not pcap.filename.endswith(".pcap"):
+        raise HTTPException( status_code=400, detail="Debe subir un archivo PCAP válido (.pcap)")
+    
     # Guardar el pcap subido en un archivo temporal
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pcap") as tmp:
@@ -54,7 +58,7 @@ async def analizador_paquete(
         raise HTTPException(status_code=500, detail="No se pudo guardar el archivo PCAP temporal.")
 
     try:
-        destinos = obtener_destinos(tmp_path)
+        destinos = get_destinations(tmp_path)
     except Exception as e:
         # Cualquier error en tshark o análisis
         raise HTTPException(status_code=500, detail=str(e))

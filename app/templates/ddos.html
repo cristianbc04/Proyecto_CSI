@@ -19,7 +19,6 @@
                 <span class="title">DDoS</span>
                 <p class="subtitle">Ataque de denegacion distribuida</p>
 
-                <!-- 👇 Este formulario hace POST a /op_ddos -->
                 <form method="post" action="/op_ddos" enctype="multipart/form-data">
                     <div style="margin-top: 12px; text-align: left; font-size: 11px; color: rgba(170,222,243,0.9);">
                         <label for="indice_destino">Indice_destino:</label><br />
@@ -36,12 +35,16 @@
                     <div style="margin-top: 10px; text-align: left; font-size: 11px; color: rgba(170,222,243,0.9);">
                         <p style="margin: 0 0 6px 0;">Subir Captura de Tráfico</p>
 
-                        <!-- Input file oculto -->
-                        <input class="input-file" type="file" id="pcap" name="pcap">
+                        <input
+                        class="input-file"
+                        type="file"
+                        id="pcap"
+                        name="pcap"
+                        required
+                        accept=".pcap"
+                        />
 
-                        <!-- Botón bonito que abre el selector de archivo -->
                         <label for="pcap" class="upload-button">
-                            <!-- Icono opcional, puedes quitar el svg si no lo quieres -->
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
                                 <path d="M4 17.5V19a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                                 <path d="M12 5v11M8.5 8.5 12 5l3.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

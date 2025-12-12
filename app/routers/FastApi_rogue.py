@@ -1,89 +1,147 @@
 import os
-import subprocess
-import sys
 import re
-from scapy.all import Ether, IP, UDP, BOOTP, DHCP, ICMP
-import scapy.all as scapy
 import tempfile
-from typing import List, Dict
+from dataclasses import dataclass
+from typing import List
 
-from fastapi import FastAPI, Form, UploadFile, File, HTTPException, Query, APIRouter, Request
+import scapy.all as scapy
+from scapy.all import Ether, IP, UDP, BOOTP, DHCP, ICMP
+
+from fastapi import Form, HTTPException, APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-templates = Jinja2Templates(directory="app/templates")
+
+# ----------------------------------------
+#  FastAPI setup
+# ----------------------------------------
 router = APIRouter()
-HEX_RE = re.compile(r'^[0-9a-fA-F]+$')
+templates = Jinja2Templates(directory="app/templates")
 
-ip_atacante = "172.16.0.10" # el rango se va a hacer en 172.16.0.0/24
-mac_atacante = "00:11:22:33:44:55"
-dns = "Suplantacion.es"
 
-# en esta funcion se va a generar el mesnaje que simula el ataque
-def mensaje_ataque(mac_victima: str):
-    victim_bytes = bytes.fromhex(mac_victima.replace(":", ""))
+# ----------------------------------------
+#  Configuración Rogue DHCP (laboratorio)
+# ----------------------------------------
+@dataclass(frozen=True)
+class RogueConfig:
+    attacker_ip: str
+    attacker_mac: str
+    dns_server: str
+    victim_ip: str
+    subnet_mask: str
+    lease_time: int
 
-    dhcp_discover = Ether(src=mac_victima, dst="ff:ff:ff:ff:ff:ff") / \
-        IP(src="0.0.0.0", dst="255.255.255.255") / \
-        UDP(sport=68, dport=67) / \
-        BOOTP(op=1, chaddr=victim_bytes) / \
-        DHCP(options=[("message-type", "discover"), "end"])
 
-    dhcp_offer = Ether(src=mac_atacante, dst="ff:ff:ff:ff:ff:ff") / \
-        IP(src=ip_atacante, dst="255.255.255.255") / \
-        UDP(sport=67, dport=68) / \
-        BOOTP(op=2, yiaddr="172.16.0.11", siaddr=ip_atacante, chaddr=victim_bytes) / \
-        DHCP(options=[
-            ("message-type", "offer"),
-            ("server_id", ip_atacante),
-            ("subnet_mask", "255.255.255.0"),
-            ("router", ip_atacante),
-            ("domain-name-server", dns),
-            ("lease_time", 3600),
-            "end"
-        ])
+ROGUE_CONFIG = RogueConfig(
+    attacker_ip="172.16.0.10",
+    attacker_mac="00:11:22:33:44:55",
+    dns_server="suplantacion.es",
+    victim_ip="172.16.0.11",
+    subnet_mask="255.255.255.0",
+    lease_time=3600,
+)
 
-    return dhcp_offer, dhcp_discover
 
-def suplantacion_dhcp(mac_victima: str):
-    
-    payload_oferta, payload_discover = mensaje_ataque(mac_victima=mac_victima)
-    packets = [payload_discover, payload_oferta]
+# ----------------------------------------
+#  Validaciones
+# ----------------------------------------
+MAC_REGEX = re.compile(r"^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$")
+
+# Valida una dirección MAC en formato XX:XX:XX:XX:XX:XX
+def is_valid_mac(mac: str) -> bool:
+    return bool(MAC_REGEX.fullmatch(mac))
+
+
+# ----------------------------------------
+#  Construcción de paquetes
+# ----------------------------------------
+def build_attack_packets(victim_mac: str, config: RogueConfig):
+    """Genera paquetes DHCP Discover y Offer para simulación Rogue DHCP."""
+    victim_bytes = bytes.fromhex(victim_mac.replace(":", ""))
+
+    dhcp_discover = (
+        Ether(src=victim_mac, dst="ff:ff:ff:ff:ff:ff")
+        / IP(src="0.0.0.0", dst="255.255.255.255")
+        / UDP(sport=68, dport=67)
+        / BOOTP(op=1, chaddr=victim_bytes)
+        / DHCP(options=[("message-type", "discover"), "end"])
+    )
+
+    dhcp_offer = (
+        Ether(src=config.attacker_mac, dst="ff:ff:ff:ff:ff:ff")
+        / IP(src=config.attacker_ip, dst="255.255.255.255")
+        / UDP(sport=67, dport=68)
+        / BOOTP(
+            op=2,
+            yiaddr=config.victim_ip,
+            siaddr=config.attacker_ip,
+            chaddr=victim_bytes,
+        )
+        / DHCP(
+            options=[
+                ("message-type", "offer"),
+                ("server_id", config.attacker_ip),
+                ("subnet_mask", config.subnet_mask),
+                ("router", config.attacker_ip),
+                ("domain-name-server", config.dns_server),
+                ("lease_time", config.lease_time),
+                "end",
+            ]
+        )
+    )
+
+    return dhcp_discover, dhcp_offer
+
+
+def perform_dhcp_spoofing(victim_mac: str, config: RogueConfig) -> List[scapy.Packet]:
+    """
+    Genera tráfico DHCP + ICMP para simulación Rogue DHCP.
+    """
+    discover_pkt, offer_pkt = build_attack_packets(victim_mac, config)
+    packets = [discover_pkt, offer_pkt]
+
     for _ in range(5):
-        mensaje_icmp = Ether(src=mac_victima, dst=mac_atacante) / \
-               IP(src="172.16.0.11", dst="172.16.0.10") / ICMP()
-        packets.append(mensaje_icmp)
-        
-    return packets
-        
+        icmp_packet = (
+            Ether(src=victim_mac, dst=config.attacker_mac)
+            / IP(src=config.victim_ip, dst=config.attacker_ip)
+            / ICMP()
+        )
+        packets.append(icmp_packet)
 
+    return packets
+
+
+# ----------------------------------------
+#  Endpoints FastAPI
+# ----------------------------------------
 @router.get("/op_rogue", response_class=HTMLResponse, tags=["op_rogue"])
-async def cargar_pagina_rogue(request: Request):
+async def rogue_page(request: Request):
     return templates.TemplateResponse("rogue.html", {"request": request})
 
+
 @router.post("/op_rogue", response_class=HTMLResponse, tags=["op_rogue"])
-async def cargar_pagina_rogue(
-    mac_victima: str = Form(..., description="MAC víctima")
+async def rogue_execute(
+    mac_victim: str = Form(..., description="MAC de la víctima")
 ):
-    if not mac_victima:
-        raise HTTPException(status_code=400, detail="Debe introducir una MAC válida.")
+    if not is_valid_mac(mac_victim):
+        raise HTTPException(status_code=400, detail="MAC inválida")
 
     out_fd, out_path = tempfile.mkstemp(suffix=".pcap")
     os.close(out_fd)
-    
+
     try:
-        paquetes = suplantacion_dhcp(mac_victima)
-        
-        if not paquetes:
-            raise HTTPException(status_code=400, detail="No se generaron paquetes.")
-            
-        scapy.wrpcap(out_path, paquetes)
-        
+        packets = perform_dhcp_spoofing(mac_victim, ROGUE_CONFIG)
+
+        if not packets:
+            raise HTTPException(status_code=400, detail="No se generaron paquetes")
+
+        scapy.wrpcap(out_path, packets)
+
         return FileResponse(
             out_path,
             media_type="application/vnd.tcpdump.pcap",
-            filename=f"rogue.pcap",
+            filename="rogue.pcap",
         )
-    except RuntimeError as e:
+
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    

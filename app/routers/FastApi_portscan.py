@@ -1,25 +1,22 @@
 #!/usr/bin/env python3
-from typing import List
 import pyfiglet
 import socket
-import subprocess
 from datetime import datetime
 from contextlib import closing
-import tempfile
 
-from fastapi import APIRouter, Request, UploadFile, File, HTTPException, Query, Form
+from fastapi import APIRouter, Request, HTTPException, Form
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-
-# --------------------------
-#   FUNCIONES INTERNAS
-# --------------------------
-
+# ----------------------------------------
+#  Funciones internas
+# ----------------------------------------
 def banner(target: str) -> str:
+    """ Obtencio de banner para vista del json """
+    
     ascii_banner = pyfiglet.figlet_format("PORT SCANNER")
     lines = [
         ascii_banner,
@@ -31,11 +28,14 @@ def banner(target: str) -> str:
     return "\n".join(lines)
 
 def PortScan(host: str, ports: str) -> str:
+    """ Funcion que obtiene lista de puertos abiertos """
+    
     output = []
     timeout = 0.8
     
     ports = ports.strip()
-
+    
+    # si no se le pasa puertos, se añaden todos los existentes
     if not ports:
         port_list = range(1, 65536)
     else:
@@ -44,7 +44,7 @@ def PortScan(host: str, ports: str) -> str:
         for part in ports.split(","):
             part = part.strip()
 
-            if "-" in part:
+            if "-" in part: # Rango de puertos (ej: 8000-8100)
                 start, end = part.split("-", 1)
                 start, end = int(start), int(end)
                 parsed_ports.update(range(start, end + 1))
@@ -52,9 +52,10 @@ def PortScan(host: str, ports: str) -> str:
                 parsed_ports.add(int(part))
 
         port_list = sorted(parsed_ports)
-
+        
+    # Escaneo de puertos TCP
     for port in port_list:
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s: # Socket TCP auxiliar para comprobar si el puerto está abierto
             s.settimeout(timeout)
             result = s.connect_ex((host, port))
 
@@ -66,26 +67,23 @@ def PortScan(host: str, ports: str) -> str:
     return "\n".join(output)
 
 
-# --------------------------
-#   RUTA HTML (GET)
-# --------------------------
+# ----------------------------------------
+#  Endpoints FastAPI
+# ----------------------------------------
 @router.get("/op_portscan", response_class=HTMLResponse, tags=["op_portscan"])
-async def cargar_pagina_portscan(request: Request):
+async def portScan_page(request: Request):
     return templates.TemplateResponse("portscan.html", {"request": request})
 
-
-# --------------------------
-#   RUTA POST (API)
-# --------------------------
 @router.post("/op_portscan", response_class=HTMLResponse, tags=["op_portscan"])
-async def ejecutar_portscan(
+async def portScan_execute(
     request: Request,
     ports: str = Form(""),
     host: str = Form(...)
 ):
     if not host:
-        raise HTTPException(status_code=400, detail="Host no válido")
-
+        raise HTTPException(status_code=400, detail="No pasaste un host")
+    
+    # Texto que guarda lo que se devolvera en formato json de puertos abiertos del equipo pasado
     result_text = (
         banner(host) +
         "\n" +

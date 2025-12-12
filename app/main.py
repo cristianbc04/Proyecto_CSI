@@ -12,7 +12,7 @@ from app.routers.FastApi_rogue import router as rogue
 
 app = FastAPI(title="Mi API CSI")
 
-# static y templates (ojo con las rutas)
+# static y templates
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
