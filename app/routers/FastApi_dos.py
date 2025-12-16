@@ -9,7 +9,7 @@ import random
 from typing import List, Dict
 
 from app.utils.render import render_form_error
-from fastapi import UploadFile, File, Query, APIRouter, Request
+from fastapi import Form, UploadFile, File, APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -197,8 +197,9 @@ async def dos_page(request: Request):
 @router.post("/op_dos", tags=["op_dos"])
 async def dos_execute(
     request: Request,
-    pcap: UploadFile = File(...),
-    destination_index: int = Query(0),
+    pcap: UploadFile = File(..., description="Archivo PCAP de entrada"),
+    destination_index: int = Form(..., description="Índice de IP destino"),
+    packet_count: int = Form(DEFAULT_PACKET_COUNT),
 ):
 
     if not pcap.filename or not pcap.filename.endswith(".pcap"):

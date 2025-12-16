@@ -7,7 +7,7 @@ import tempfile
 from typing import List, Dict
 
 from app.utils.render import render_form_error
-from fastapi import UploadFile, File, Query, APIRouter, Request
+from fastapi import Form, UploadFile, File, APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -213,13 +213,8 @@ async def ddos_page(request: Request):
 async def ddos_execute(
     request: Request,
     pcap: UploadFile = File(..., description="Archivo PCAP de entrada"),
-    destination_index: int = Query(0, ge=0, description="Índice de IP destino"),
-    packet_count: int = Query(
-        DEFAULT_PACKET_COUNT,
-        ge=1,
-        le=10000,
-        description="Paquetes por IP origen",
-    ),
+    destination_index: int = Form(..., description="Índice de IP destino"),
+    packet_count: int = Form(DEFAULT_PACKET_COUNT),
 ):
     # Guardar PCAP de entrada
     try:
@@ -230,7 +225,7 @@ async def ddos_execute(
         return render_form_error(
             templates,
             request,
-            "dos.html",
+            "ddos.html",
             "No se pudo guardar el PCAP de entrada.",
             status_code=500,
         )
@@ -252,8 +247,19 @@ async def ddos_execute(
         target_ip = destinations[destination_index]
         extracted_data = extract_udp_messages(input_path)
 
+        # 🔹 FILTRADO CLAVE POR DESTINO
+        filtered_data = [
+            entry for entry in extracted_data
+            if entry["ip_dst"] == target_ip
+        ]
+
+        if not filtered_data:
+            raise RuntimeError(
+                f"No hay tráfico UDP hacia la IP destino seleccionada: {target_ip}"
+            )
+
         packet_total = generate_attack_pcap(
-            extracted_data,
+            filtered_data,
             target_ip,
             packet_count,
             output_path,
@@ -278,8 +284,8 @@ async def ddos_execute(
         return render_form_error(
             templates,
             request,
-            "dos.html",
-            "Error inesperado durante la generación del ataque DoS.",
+            "ddos.html",
+            "Error inesperado durante la generación del ataque DDoS.",
             status_code=500,
         )
 
