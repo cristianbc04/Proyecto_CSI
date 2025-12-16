@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-import ipaddress
 import pyfiglet
 import socket
 from datetime import datetime
 from contextlib import closing
 
 from app.utils.render import render_form_error
+from app.utils.Operations_Common import is_valid_ip
 from fastapi import Form, APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -16,13 +16,6 @@ templates = Jinja2Templates(directory="app/templates")
 # ----------------------------------------
 #  Funciones internas
 # ----------------------------------------
-def is_valid_ip(address: str) -> bool:
-    """Comprueba si una IP tiene un formato válido."""
-    try:
-        ipaddress.ip_address(address)
-        return True
-    except ValueError:
-        return False
 
 def banner(target: str) -> str:
     """ Obtencio de banner para vista del json """

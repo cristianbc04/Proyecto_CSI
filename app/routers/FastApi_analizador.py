@@ -1,37 +1,14 @@
 #!/usr/bin/env python3
-import subprocess
 import tempfile
 
 from app.utils.render import render_form_error
+from app.utils.Operations_Common import extract_destinations
 from fastapi import UploadFile, File, APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
-
-# ----------------------------------------
-#  Funciones internas
-# ----------------------------------------
-def get_destinations(pcap_file):
-    """ Funcion que obtiene cantidad de destinos del pcap """
-    
-    TSHARK_COMMAND = [ # comandos para poder analizar el archivo .pcacp que se le pase.
-        "tshark",
-        "-r", pcap_file, # para saber que archivo es el que vamos a leer.
-        "-T", "fields", 
-        "-e", "ip.dst", # sirve para poder extraer el campo IP 
-        "udp" # filtra los paquetes por UDP 
-    ]
-    
-    try:
-        resultado = subprocess.run(TSHARK_COMMAND, capture_output=True, text=True, check=True)
-        lineas = resultado.stdout.strip().split('\n')
-        destinos = set([linea.strip() for linea in lineas if linea.strip()])
-        return destinos
-
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError("Error ejecutando tshark") from e  
 
 # ----------------------------------------
 #  Endpoints FastAPI
@@ -78,7 +55,7 @@ async def analizador_execute(
         )
 
     try:
-        destinos = get_destinations(tmp_path)
+        destinos = extract_destinations(tmp_path)
 
     except RuntimeError as e:
         return render_form_error(

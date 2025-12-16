@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import ipaddress
 import os
 import re
 import socket
@@ -9,6 +8,7 @@ import random
 from typing import List, Dict
 
 from app.utils.render import render_form_error
+from app.utils.Operations_Common import is_valid_ip, extract_destinations
 from fastapi import Form, UploadFile, File, APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -30,32 +30,6 @@ templates = Jinja2Templates(directory="app/templates")
 # ======================================================
 #  Funciones internas
 # ======================================================
-
-def extract_destinations(pcap_path: str) -> List[str]:
-    """Obtiene las IP destino únicas desde un PCAP (tráfico UDP)."""
-    cmd = [
-        "tshark",
-        "-r", pcap_path,
-        "-T", "fields",
-        "-e", "ip.dst",
-        "udp",
-    ]
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"No se pudo ejecutar tshark: {e}") from e
-
-    destinations = []
-    seen = set()
-
-    for line in result.stdout.splitlines():
-        ip = line.strip()
-        if ip and ip not in seen:
-            seen.add(ip)
-            destinations.append(ip)
-
-    return destinations
 
 
 def parse_message_lines(lines: List[str]) -> List[Dict[str, str]]:
@@ -101,15 +75,6 @@ def extract_udp_messages(pcap_path: str) -> List[Dict[str, str]]:
         raise RuntimeError(f"No se pudieron extraer mensajes UDP: {e}") from e
 
     return parse_message_lines(result.stdout.splitlines())
-
-
-def is_valid_ip(address: str) -> bool:
-    """Comprueba si una IP tiene un formato válido."""
-    try:
-        ipaddress.ip_address(address)
-        return True
-    except ValueError:
-        return False
 
 
 def payload_to_bytes(payload: str) -> bytes:
