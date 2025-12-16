@@ -3,25 +3,26 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.routers.FastApi_ddos import router as ddos_router
-from app.routers.FastApi_analizador import router as analizador
-from app.routers.FastApi_portscan import router as portscan
-from app.routers.FastApi_dos import router as dos
-from app.routers.FastApi_arpSpoofing import router as arp
-from app.routers.FastApi_rogue import router as rogue
+from app.routers import (
+    ddos_router,
+    analizador_router,
+    portscan_router,
+    dos_router,
+    arp_router,
+    rogue_router,
+)
 
 app = FastAPI(title="Mi API CSI")
 
-# static y templates
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
 app.include_router(ddos_router)
-app.include_router(analizador)
-app.include_router(portscan)
-app.include_router(dos)
-app.include_router(arp)
-app.include_router(rogue)
+app.include_router(analizador_router)
+app.include_router(portscan_router)
+app.include_router(dos_router)
+app.include_router(arp_router)
+app.include_router(rogue_router)
 
 @app.get("/", response_class=HTMLResponse)
 async def root(request: Request):

@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>DDoS - CSI API</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles/error.css">
 </head>
 <body>
     <main class="page">
@@ -18,6 +19,12 @@
             <div class="bottom-section">
                 <span class="title">DDoS</span>
                 <p class="subtitle">Ataque de denegacion distribuida</p>
+
+            {% if error %}
+<div class="error-box">
+    {{ error }}
+</div>
+{% endif %}
 
                 <form method="post" action="/op_ddos" enctype="multipart/form-data">
                     <div style="margin-top: 12px; text-align: left; font-size: 11px; color: rgba(170,222,243,0.9);">

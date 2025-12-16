@@ -6,7 +6,8 @@ import subprocess
 import tempfile
 from typing import List, Dict
 
-from fastapi import UploadFile, File, HTTPException, Query, APIRouter, Request
+from app.utils.render import render_form_error
+from fastapi import UploadFile, File, Query, APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -210,6 +211,7 @@ async def ddos_page(request: Request):
 
 @router.post("/op_ddos", response_class=FileResponse, tags=["op_ddos"])
 async def ddos_execute(
+    request: Request,
     pcap: UploadFile = File(..., description="Archivo PCAP de entrada"),
     destination_index: int = Query(0, ge=0, description="Índice de IP destino"),
     packet_count: int = Query(
@@ -225,7 +227,13 @@ async def ddos_execute(
             tmp.write(await pcap.read())
             input_path = tmp.name
     except Exception:
-        raise HTTPException(500, "No se pudo guardar el PCAP de entrada")
+        return render_form_error(
+            templates,
+            request,
+            "dos.html",
+            "No se pudo guardar el PCAP de entrada.",
+            status_code=500,
+        )
 
     # Archivo de salida
     out_fd, output_path = tempfile.mkstemp(suffix=".pcap")
@@ -234,15 +242,11 @@ async def ddos_execute(
     try:
         destinations = extract_destinations(input_path)
         if not destinations:
-            raise HTTPException(400, "No se encontraron IP destino en el PCAP")
+            raise RuntimeError("No se encontraron IP destino en el PCAP")
 
         if destination_index >= len(destinations):
-            raise HTTPException(
-                400,
-                {
-                    "error": "Índice fuera de rango",
-                    "destinos": destinations,
-                },
+            raise RuntimeError(
+                f"Índice fuera de rango. Valores válidos: 0-{len(destinations)-1}"
             )
 
         target_ip = destinations[destination_index]
@@ -262,7 +266,22 @@ async def ddos_execute(
         )
 
     except RuntimeError as e:
-        raise HTTPException(500, str(e))
+        return render_form_error(
+            templates,
+            request,
+            "ddos.html",
+            str(e),
+            status_code=500,
+        )
+    
+    except Exception:
+        return render_form_error(
+            templates,
+            request,
+            "dos.html",
+            "Error inesperado durante la generación del ataque DoS.",
+            status_code=500,
+        )
 
     finally:
         if os.path.exists(input_path):

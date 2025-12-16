@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>Analizador - CSI API</title>
     <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/styles/error.css">
 </head>
 <body>
     <main class="page">
@@ -18,6 +19,12 @@
             <div class="bottom-section">
                 <span class="title">Analizador</span>
                 <p class="subtitle">Obtencion de numero de destinos</p>
+
+            {% if error %}
+<div class="error-box">
+    {{ error }}
+</div>
+{% endif %}
 
                 <!-- Este formulario hace POST a /op_analizador -->
                 <form method="post" action="/op_analizador" enctype="multipart/form-data">

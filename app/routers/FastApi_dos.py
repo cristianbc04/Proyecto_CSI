@@ -8,7 +8,8 @@ import tempfile
 import random
 from typing import List, Dict
 
-from fastapi import UploadFile, File, HTTPException, Query, APIRouter, Request
+from app.utils.render import render_form_error
+from fastapi import UploadFile, File, Query, APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -142,7 +143,7 @@ def generate_dos_packets(
 
     source_ips = {entry["ip_src"] for entry in extracted_data if entry.get("ip_src")}
     if not source_ips:
-        raise HTTPException(status_code=400, detail="No se encontraron IPs de origen.")
+        raise RuntimeError("No se encontraron IPs de origen.")
 
     # Seleccionar una IP origen aleatoria del PCAP
     random_source = random.choice(list(source_ips))
@@ -161,16 +162,10 @@ def generate_dos_packets(
                 "payload": default_payload,
             })
         else:
-            raise HTTPException(
-                status_code=400,
-                detail=f"IP inválida descartada: {ip}",
-            )
+            raise RuntimeError(f"IP inválida descartada: {ip}")
 
     if not attack_sources:
-        raise HTTPException(
-            status_code=400,
-            detail="No hay IPs de origen válidas disponibles.",
-        )
+        raise RuntimeError("No hay IPs de origen válidas disponibles.")
 
     for src in attack_sources:
         for i in range(packet_count):
@@ -183,10 +178,7 @@ def generate_dos_packets(
             packets.append(pkt)
 
     if not packets:
-        raise HTTPException(
-            status_code=400,
-            detail="No se generó ningún paquete.",
-        )
+        raise RuntimeError("No se generó ningún paquete.")
 
     wrpcap(output_path, packets)
     return len(packets)
@@ -204,42 +196,43 @@ async def dos_page(request: Request):
 
 @router.post("/op_dos", tags=["op_dos"])
 async def dos_execute(
-    pcap: UploadFile = File(..., description="Archivo PCAP de entrada"),
-    destination_index: int = Query(0, ge=0, description="Índice de IP destino"),
+    request: Request,
+    pcap: UploadFile = File(...),
+    destination_index: int = Query(0),
 ):
-    """Recibe un PCAP, genera un PCAP de ataque DoS y lo devuelve."""
 
-    # Guardar PCAP de entrada
+    if not pcap.filename or not pcap.filename.endswith(".pcap"):
+        return render_form_error(
+            templates,
+            request,
+            "dos.html",
+            "Debe subir un archivo PCAP válido.",
+        )
+
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pcap") as tmp:
             tmp.write(await pcap.read())
             input_path = tmp.name
     except Exception:
-        raise HTTPException(
+        return render_form_error(
+            templates,
+            request,
+            "dos.html",
+            "No se pudo guardar el PCAP de entrada.",
             status_code=500,
-            detail="No se pudo guardar el archivo PCAP de entrada.",
         )
 
-    # Crear archivo PCAP de salida
     out_fd, output_path = tempfile.mkstemp(suffix=".pcap")
     os.close(out_fd)
 
     try:
         destinations = extract_destinations(input_path)
         if not destinations:
-            raise HTTPException(
-                status_code=400,
-                detail="No se encontraron IPs destino en el PCAP.",
-            )
+            raise RuntimeError("No se encontraron IPs destino en el PCAP.")
 
         if destination_index >= len(destinations):
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "error": "Índice fuera de rango",
-                    "indices_validos": list(range(len(destinations))),
-                    "destinos": destinations,
-                },
+            raise RuntimeError(
+                f"Índice fuera de rango. Valores válidos: 0-{len(destinations)-1}"
             )
 
         target_ip = destinations[destination_index]
@@ -259,8 +252,24 @@ async def dos_execute(
         )
 
     except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        return render_form_error(
+            templates,
+            request,
+            "dos.html",
+            str(e),
+            status_code=500,
+        )
+
+    except Exception:
+        return render_form_error(
+            templates,
+            request,
+            "dos.html",
+            "Error inesperado durante la generación del ataque DoS.",
+            status_code=500,
+        )
 
     finally:
         if os.path.exists(input_path):
             os.remove(input_path)
+

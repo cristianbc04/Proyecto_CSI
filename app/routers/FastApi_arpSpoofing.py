@@ -4,7 +4,8 @@ import os
 import tempfile
 import scapy.all as scapy
 
-from fastapi import HTTPException, APIRouter, Request, Form
+from app.utils.render import render_form_error
+from fastapi import Form, APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -108,37 +109,65 @@ async def arp_page(request: Request):
         return templates.TemplateResponse("arp.html", {"request": request})
     
 
-@router.post("/op_arp", response_class=FileResponse, tags=["op_arp"])
+@router.post("/op_arp", tags=["op_arp"])
 async def arp_execute(
+    request: Request,
     ip_victima: str = Form(None, description="IP victima"),
     ip_router: str = Form(None, description="IP router")
-):  
-    
-    if not is_valid_ip(ip_victima) or is_valid_ip(ip_router):
-        raise HTTPException(status_code=500, detail="La ip de router y/o ip de la victima son validas")
-    
-    # Crear archivo de salida temporal
+):
+
+    # -------------------------
+    # Validación de IPs
+    # -------------------------
+    if not is_valid_ip(ip_victima) or not is_valid_ip(ip_router):
+        return render_form_error(
+            templates,
+            request,
+            "arp.html",
+            "La IP de la víctima o del router no es válida.",
+            ip_victima=ip_victima,
+            ip_router=ip_router,
+        )
+
+    # Crear archivo temporal
     out_fd, out_path = tempfile.mkstemp(suffix=".pcap")
     os.close(out_fd)
-    
-    iface = detect_physical_iface()
-    if iface is None:
-        raise HTTPException(status_code=500, detail="No se detectó una interfaz de red válida.")
+
     try:
+        iface = detect_physical_iface()
+        if iface is None:
+            raise RuntimeError("No se detectó una interfaz de red válida.")
+
         paquetes = generate_pcap(ip_victima, ip_router, iface)
-        
         if not paquetes:
-                raise HTTPException(status_code=400, detail="No se generaron paquetes.")
-            
-        # Guardar PCAP en el archivo temporal
+            raise RuntimeError("No se generaron paquetes ARP.")
+
         scapy.wrpcap(out_path, paquetes)
-        
-        # Devolvemos el archivo generado
+
         return FileResponse(
             out_path,
             media_type="application/vnd.tcpdump.pcap",
-            filename=f"arp_spoofing.pcap",
+            filename="arp_spoofing.pcap",
         )
+
     except RuntimeError as e:
-        # errores de nuestra lógica
-        raise HTTPException(status_code=500, detail=str(e))
+        return render_form_error(
+            templates,
+            request,
+            "arp.html",
+            str(e),
+            status_code=500,
+            ip_victima=ip_victima,
+            ip_router=ip_router,
+        )
+
+    except Exception:
+        return render_form_error(
+            templates,
+            request,
+            "arp.html",
+            "Se produjo un error inesperado durante la ejecución del ARP Spoofing.",
+            status_code=500,
+            ip_victima=ip_victima,
+            ip_router=ip_router,
+        )

@@ -5,7 +5,8 @@ import socket
 from datetime import datetime
 from contextlib import closing
 
-from fastapi import APIRouter, Request, HTTPException, Form
+from app.utils.render import render_form_error
+from fastapi import Form, APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -83,30 +84,64 @@ def PortScan(host: str, ports: str) -> str:
 async def portScan_page(request: Request):
     return templates.TemplateResponse("portscan.html", {"request": request})
 
-@router.post("/op_portscan", response_class=HTMLResponse, tags=["op_portscan"])
+
+@router.post("/op_portscan", tags=["op_portscan"])
 async def portScan_execute(
     request: Request,
     ports: str = Form(""),
     host: str = Form(...)
 ):
+
     if not host:
-        raise HTTPException(status_code=400, detail="No pasaste un host")
-    
+        return render_form_error(
+            templates,
+            request,
+            "portscan.html",
+            "Debe introducir un host.",
+            host=host,
+            ports=ports,
+        )
+
     if not is_valid_ip(host):
-        raise HTTPException(status_code=400, detail="La ip que has pasado no es valida")
-    
-    # Texto que guarda lo que se devolvera en formato json de puertos abiertos del equipo pasado
-    result_text = (
-        banner(host) +
-        "\n" +
-        PortScan(host, ports)
-    )
+        return render_form_error(
+            templates,
+            request,
+            "portscan.html",
+            "La IP introducida no es válida.",
+            host=host,
+            ports=ports,
+        )
+
+    try:
+        result_text = banner(host) + "\n" + PortScan(host, ports)
+
+    except RuntimeError as e:
+        return render_form_error(
+            templates,
+            request,
+            "portscan.html",
+            str(e),
+            status_code=500,
+            host=host,
+            ports=ports,
+        )
+
+    except Exception:
+        return render_form_error(
+            templates,
+            request,
+            "portscan.html",
+            "Se produjo un error inesperado durante el escaneo de puertos.",
+            status_code=500,
+            host=host,
+            ports=ports,
+        )
 
     return templates.TemplateResponse(
         "salida_portScan.html",
         {
             "request": request,
-            "result": result_text
-        }
+            "result": result_text,
+        },
     )
         

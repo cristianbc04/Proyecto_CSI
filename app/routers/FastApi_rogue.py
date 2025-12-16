@@ -7,7 +7,8 @@ from typing import List
 import scapy.all as scapy
 from scapy.all import Ether, IP, UDP, BOOTP, DHCP, ICMP
 
-from fastapi import Form, HTTPException, APIRouter, Request
+from app.utils.render import render_form_error
+from fastapi import Form, APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -120,12 +121,21 @@ async def rogue_page(request: Request):
     return templates.TemplateResponse("rogue.html", {"request": request})
 
 
-@router.post("/op_rogue", response_class=HTMLResponse, tags=["op_rogue"])
+
+@router.post("/op_rogue", tags=["op_rogue"])
 async def rogue_execute(
+    request: Request,
     mac_victim: str = Form(..., description="MAC de la víctima")
 ):
+
     if not is_valid_mac(mac_victim):
-        raise HTTPException(status_code=400, detail="MAC inválida")
+        return render_form_error(
+            templates,
+            request,
+            "rogue.html",
+            "La dirección MAC introducida no es válida.",
+            mac_victim=mac_victim,
+        )
 
     out_fd, out_path = tempfile.mkstemp(suffix=".pcap")
     os.close(out_fd)
@@ -134,7 +144,7 @@ async def rogue_execute(
         packets = perform_dhcp_spoofing(mac_victim, ROGUE_CONFIG)
 
         if not packets:
-            raise HTTPException(status_code=400, detail="No se generaron paquetes")
+            raise RuntimeError("No se generaron paquetes DHCP.")
 
         scapy.wrpcap(out_path, packets)
 
@@ -144,5 +154,22 @@ async def rogue_execute(
             filename="rogue.pcap",
         )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except RuntimeError as e:
+        return render_form_error(
+            templates,
+            request,
+            "rogue.html",
+            str(e),
+            status_code=500,
+            mac_victim=mac_victim,
+        )
+
+    except Exception:
+        return render_form_error(
+            templates,
+            request,
+            "rogue.html",
+            "Se produjo un error inesperado durante la ejecución del Rogue DHCP.",
+            status_code=500,
+            mac_victim=mac_victim,
+        )

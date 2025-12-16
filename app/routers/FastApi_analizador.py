@@ -2,7 +2,8 @@
 import subprocess
 import tempfile
 
-from fastapi import UploadFile, File, HTTPException, Query, APIRouter, Request
+from app.utils.render import render_form_error
+from fastapi import UploadFile, File, APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -39,30 +40,65 @@ def get_destinations(pcap_file):
 async def analizador_page(request: Request):
     return templates.TemplateResponse("analizador.html", {"request": request})
 
+
 @router.post("/op_analizador", tags=["op_analizador"])
 async def analizador_execute(
     request: Request,
     pcap: UploadFile = File(..., description="Archivo PCAP de entrada")
 ):
-    if not pcap.filename or not pcap.filename.endswith(".pcap"):
-        raise HTTPException( status_code=400, detail="Debe subir un archivo PCAP válido (.pcap)")
-    
-    # Guardar el pcap subido en un archivo temporal
+
+    if not pcap.filename:
+        return render_form_error(
+            templates,
+            request,
+            "analizador.html",
+            "No se ha seleccionado ningún archivo."
+        )
+
+    if not pcap.filename.endswith(".pcap"):
+        return render_form_error(
+            templates,
+            request,
+            "analizador.html",
+            "Debe subir un archivo Pcap"
+        )
+
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pcap") as tmp:
             contenido = await pcap.read()
             tmp.write(contenido)
             tmp_path = tmp.name
     except Exception:
-        raise HTTPException(status_code=500, detail="No se pudo guardar el archivo PCAP temporal.")
+        return render_form_error(
+            templates,
+            request,
+            "analizador.html",
+            "No se pudo guardar el archivo PCAP temporal.",
+            status_code=500,
+        )
 
     try:
         destinos = get_destinations(tmp_path)
-    except Exception as e:
-        # Cualquier error en tshark o análisis
-        raise HTTPException(status_code=500, detail=str(e))
+
+    except RuntimeError as e:
+        return render_form_error(
+            templates,
+            request,
+            "analizador.html",
+            str(e),
+            status_code=500,
+        )
+
+    except Exception:
+        return render_form_error(
+            templates,
+            request,
+            "analizador.html",
+            "Error inesperado durante el análisis del tráfico.",
+            status_code=500,
+        )
+
     finally:
-        # Limpieza del archivo temporal
         try:
             import os
             if os.path.exists(tmp_path):
@@ -70,12 +106,13 @@ async def analizador_execute(
         except Exception:
             pass
 
-    # devuelto en formato json a la vista que trata con el parametro pasado en context
-    return templates.TemplateResponse( 
-        name="valores_json.html", 
-        context={
-            "request": request, # requerido por el paremetro context           
+    return templates.TemplateResponse(
+        "salida_jsonAnalizador.html",
+        {
+            "request": request,
             "total_destinos": len(destinos),
-            "destinos": list(destinos)
-        })
+            "destinos": list(destinos),
+        },
+    )
+
 
