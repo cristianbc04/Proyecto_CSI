@@ -24,7 +24,6 @@ HEX_PAYLOAD_REGEX = re.compile(r"^[0-9a-fA-F]+$")
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 
-
 # ======================================================
 #  Funciones auxiliares
 # ======================================================
