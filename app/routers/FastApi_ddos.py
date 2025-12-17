@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 import os
-import re
-import subprocess
 import tempfile
 from typing import List, Dict
 
 from app.utils.render import render_form_error
-from app.utils.Operations_Common import is_valid_ip, extract_destinations
+from app.utils.operations_CommonAll import is_valid_ip, extract_destinations
+from app.utils.operations_DenegacionServicios import extract_udp_messages, payload_to_bytes
 from fastapi import Form, UploadFile, File, APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -19,81 +18,10 @@ from scapy.all import IP, UDP, Raw, wrpcap
 # ======================================================
 
 DEFAULT_PACKET_COUNT = 50
-HEX_PAYLOAD_REGEX = re.compile(r"^[0-9a-fA-F]+$")
+# HEX_PAYLOAD_REGEX = re.compile(r"^[0-9a-fA-F]+$")
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
-
-# ======================================================
-#  Funciones auxiliares
-# ======================================================
-
-
-def hex_or_text_to_bytes(payload: str) -> bytes:
-    """
-    Convierte un payload hexadecimal a bytes si es válido.
-    Si no, devuelve el texto codificado.
-    """
-    clean = payload.replace(":", "").replace(" ", "")
-
-    if HEX_PAYLOAD_REGEX.fullmatch(clean) and len(clean) % 2 == 0:
-        try:
-            return bytes.fromhex(clean)
-        except ValueError:
-            pass
-
-    return payload.encode("latin1", errors="replace")
-
-
-# ======================================================
-#  Extracción de información desde PCAP
-# ======================================================
-
-
-def parse_message_lines(lines: List[str]) -> List[Dict[str, str]]:
-    """
-    Procesa líneas tshark con formato:
-    ip.src \t ip.dst \t data.data
-    """
-    
-    parsed = []
-    for line in lines:
-        fields = line.strip().split("\t")
-        if len(fields) < 3:
-            continue
-
-        src_ip, dst_ip, message = map(str.strip, fields[:3])
-        if not (src_ip and dst_ip and message):
-            continue
-
-        parsed.append({
-            "ip_src": src_ip,
-            "ip_dst": dst_ip,
-            "message": message,
-        })
-
-    return parsed
-
-
-def extract_udp_messages(pcap_path: str) -> List[Dict[str, str]]:
-    """Extrae mensajes UDP (payload) desde un PCAP usando tshark."""
-    
-    cmd = [
-        "tshark",
-        "-r", pcap_path,
-        "-T", "fields",
-        "-e", "ip.src",
-        "-e", "ip.dst",
-        "-e", "data.data",
-        "udp",
-    ]
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"No se pudieron extraer mensajes UDP: {e}") from e
-
-    return parse_message_lines(result.stdout.splitlines())
 
 
 # ======================================================
@@ -105,7 +33,7 @@ def generate_attack_pcap(
     target_ip: str,
     packet_count: int,
     output_path: str,
-) -> int:
+):
     """
     Genera un PCAP con tráfico UDP repetitivo hacia una IP destino,
     reutilizando payloads observados.
@@ -127,13 +55,13 @@ def generate_attack_pcap(
     payload_by_src = {}
     for entry in extracted_data:
         src = entry["ip_src"]
-        if src not in payload_by_src and entry.get("message"):
-            payload_by_src[src] = entry["message"]
+        if src not in payload_by_src and entry.get("payload"):
+            payload_by_src[src] = entry["payload"]
 
     for src_ip in source_ips:
         payload_hex = next(
             (
-                d["message"]
+                d["payload"]
                 for d in extracted_data
                 if d["ip_src"] == src_ip and d["ip_dst"] == target_ip
             ),
@@ -141,7 +69,7 @@ def generate_attack_pcap(
         )
 
         payload_bytes = (
-            hex_or_text_to_bytes(payload_hex)
+            payload_to_bytes(payload_hex)
             if payload_hex
             else default_payload
         )
@@ -159,7 +87,6 @@ def generate_attack_pcap(
         raise RuntimeError("No se generaron paquetes UDP.")
 
     wrpcap(output_path, packets)
-    return len(packets)
 
 
 # ======================================================
@@ -220,7 +147,7 @@ async def ddos_execute(
                 f"No hay tráfico UDP hacia la IP destino seleccionada: {target_ip}"
             )
 
-        packet_total = generate_attack_pcap(
+        generate_attack_pcap(
             filtered_data,
             target_ip,
             packet_count,

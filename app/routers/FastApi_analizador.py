@@ -2,7 +2,7 @@
 import tempfile
 
 from app.utils.render import render_form_error
-from app.utils.Operations_Common import extract_destinations
+from app.utils.operations_CommonAll import extract_destinations
 from fastapi import UploadFile, File, APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates

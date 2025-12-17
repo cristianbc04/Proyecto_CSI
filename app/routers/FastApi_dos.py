@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 import os
-import re
 import socket
-import subprocess
 import tempfile
 import random
 from typing import List, Dict
 
 from app.utils.render import render_form_error
-from app.utils.Operations_Common import is_valid_ip, extract_destinations
+from app.utils.operations_CommonAll import is_valid_ip, extract_destinations
+from app.utils.operations_DenegacionServicios import extract_udp_messages
 from fastapi import Form, UploadFile, File, APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -21,76 +20,10 @@ from scapy.all import IP, UDP, Raw, wrpcap
 # ======================================================
 
 DEFAULT_PACKET_COUNT = 50
-HEX_PAYLOAD_REGEX = re.compile(r"^[0-9a-fA-F]+$")
+# HEX_PAYLOAD_REGEX = re.compile(r"^[0-9a-fA-F]+$")
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
-
-
-# ======================================================
-#  Funciones internas
-# ======================================================
-
-
-def parse_message_lines(lines: List[str]) -> List[Dict[str, str]]:
-    """
-    Procesa líneas de tshark con formato:
-    ip.src \\t ip.dst \\t data.data
-    """
-    parsed = []
-
-    for line in lines:
-        fields = line.strip().split("\t")
-        if len(fields) < 3:
-            continue
-
-        src_ip, dst_ip, payload = map(str.strip, fields[:3])
-        if not (src_ip and dst_ip and payload):
-            continue
-
-        parsed.append({
-            "ip_src": src_ip,
-            "ip_dst": dst_ip,
-            "payload": payload,
-        })
-
-    return parsed
-
-
-def extract_udp_messages(pcap_path: str) -> List[Dict[str, str]]:
-    """Extrae mensajes UDP (payload) desde un PCAP usando tshark."""
-    cmd = [
-        "tshark",
-        "-r", pcap_path,
-        "-T", "fields",
-        "-e", "ip.src",
-        "-e", "ip.dst",
-        "-e", "data.data",
-        "udp",
-    ]
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"No se pudieron extraer mensajes UDP: {e}") from e
-
-    return parse_message_lines(result.stdout.splitlines())
-
-
-def payload_to_bytes(payload: str) -> bytes:
-    """
-    Convierte un payload en formato string a bytes.
-    Si es hexadecimal válido, se decodifica; si no, se trata como texto.
-    """
-    clean = payload.replace(":", "").replace(" ", "")
-
-    if HEX_PAYLOAD_REGEX.fullmatch(clean) and len(clean) % 2 == 0:
-        try:
-            return bytes.fromhex(clean)
-        except ValueError:
-            pass
-
-    return payload.encode("latin1", errors="replace")
 
 
 def generate_dos_packets(
@@ -98,7 +31,7 @@ def generate_dos_packets(
     target_ip: str,
     packet_count: int,
     output_path: str,
-) -> int:
+):
     """
     Simulación de un ataque DoS mediante tráfico UDP.
     Genera un PCAP con paquetes forjados hacia la IP objetivo.
@@ -146,7 +79,6 @@ def generate_dos_packets(
         raise RuntimeError("No se generó ningún paquete.")
 
     wrpcap(output_path, packets)
-    return len(packets)
 
 
 # ======================================================
