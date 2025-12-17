@@ -34,7 +34,6 @@ Proyecto_CSI/
  │   ├── templates/       # HTML de la interfaz
  │   ├── static/          # CSS / imágenes
  │   ├── main.py          # Punto de entrada de la API
- │   └── __init__.py
  └── README.md
 ```
 
