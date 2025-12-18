@@ -101,11 +101,10 @@ async def ddos_page(request: Request):
 @router.post("/op_ddos", response_class=FileResponse, tags=["op_ddos"])
 async def ddos_execute(
     request: Request,
-    pcap: UploadFile = File(..., description="Archivo PCAP de entrada"),
-    destination_index: int = Form(..., description="Índice de IP destino"),
+    pcap: UploadFile = File(...),
+    destination_index: int = Form(...),
     packet_count: int = Form(DEFAULT_PACKET_COUNT),
 ):
-    # Guardar PCAP de entrada
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".pcap") as tmp:
             tmp.write(await pcap.read())
@@ -119,7 +118,6 @@ async def ddos_execute(
             status_code=500,
         )
 
-    # Archivo de salida
     out_fd, output_path = tempfile.mkstemp(suffix=".pcap")
     os.close(out_fd)
 
@@ -134,21 +132,13 @@ async def ddos_execute(
             )
 
         target_ip = destinations[destination_index]
+
         extracted_data = extract_udp_messages(input_path)
-
-        # 🔹 FILTRADO CLAVE POR DESTINO
-        filtered_data = [
-            entry for entry in extracted_data
-            if entry["ip_dst"] == target_ip
-        ]
-
-        if not filtered_data:
-            raise RuntimeError(
-                f"No hay tráfico UDP hacia la IP destino seleccionada: {target_ip}"
-            )
+        if not extracted_data:
+            raise RuntimeError("No se encontró tráfico UDP en el PCAP")
 
         generate_attack_pcap(
-            filtered_data,
+            extracted_data,
             target_ip,
             packet_count,
             output_path,
@@ -168,16 +158,8 @@ async def ddos_execute(
             str(e),
             status_code=500,
         )
-    
-    except Exception:
-        return render_form_error(
-            templates,
-            request,
-            "ddos.html",
-            "Error inesperado durante la generación del ataque DDoS.",
-            status_code=500,
-        )
 
     finally:
         if os.path.exists(input_path):
             os.remove(input_path)
+
