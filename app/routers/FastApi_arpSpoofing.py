@@ -4,6 +4,7 @@ import os
 import tempfile
 import scapy.all as scapy
 
+from app.utils.operations_CommonAll import is_valid_ip
 from app.utils.render import render_form_error
 from fastapi import Form, APIRouter, Request
 from fastapi.responses import FileResponse, HTMLResponse
@@ -15,13 +16,6 @@ templates = Jinja2Templates(directory="app/templates")
 # ----------------------------------------
 #  Funciones internas
 # ----------------------------------------
-def is_valid_ip(address: str) -> bool:
-    """Comprueba si una IP tiene un formato válido."""
-    try:
-        ipaddress.ip_address(address)
-        return True
-    except ValueError:
-        return False
 
 def detect_physical_iface():
     """ que tenga dirección IP en una red privada. Funciona para cualquier IP y cualquier interfaz física."""
@@ -112,8 +106,8 @@ async def arp_page(request: Request):
 @router.post("/op_arp", tags=["op_arp"])
 async def arp_execute(
     request: Request,
-    ip_victima: str = Form(None, description="IP victima"),
-    ip_router: str = Form(None, description="IP router")
+    ip_victima: str = Form(..., description="IP victima"),
+    ip_router: str = Form(..., description="IP router")
 ):
 
     # -------------------------
